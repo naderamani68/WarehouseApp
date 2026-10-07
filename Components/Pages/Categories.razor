@@ -5,27 +5,11 @@
 @using WarehouseApp.Services
 @using System.Globalization
 @inject ExcelService Excel
+@inject ToastService Toasts
 
 <PageTitle>دسته‌بندی‌ها | WarehouseApp</PageTitle>
 
 <h3 class="mb-3">📁 مدیریت دسته‌بندی محصولات</h3>
-
-@* ===== پیام‌های موفقیت/خطا ===== *@
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <div class="alert alert-success alert-dismissible">
-        @successMessage
-        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
-    </div>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger alert-dismissible">
-        @errorMessage
-        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
-    </div>
-}
 
 @* ===== فرم افزودن/ویرایش ===== *@
 <div class="row">
@@ -56,6 +40,8 @@
                     <button class="btn btn-success" @onclick="SaveEdit">💾 ذخیره تغییرات</button>
                     <button class="btn btn-secondary" @onclick="CancelEdit">انصراف</button>
                 }
+@* ===== پیام‌های شناور — کنار دکمهٔ ثبت ===== *@
+<ToastHost Inline="true" />
 
             </div>
         </div>
@@ -161,8 +147,6 @@
     // ===== حالت‌های صفحه =====
     private List<CategoryListItem> categories = new();
     private Category? editingCategory = null;
-    private string? successMessage;
-    private string? errorMessage;
 
     private string? newName;
     private string? newDescription;
@@ -208,7 +192,7 @@
     {
         if (string.IsNullOrWhiteSpace(newName))
         {
-            errorMessage = "نام دسته نمی‌تواند خالی باشد.";
+            Toasts.ShowError("نام دسته نمی‌تواند خالی باشد.");
             return;
         }
 
@@ -224,12 +208,12 @@
             await Db.SaveChangesAsync();
             await LoadCategories();
 
-            successMessage = $"دسته «{cat.Name}» با موفقیت اضافه شد ✅";
+            Toasts.ShowSuccess($"دسته «{cat.Name}» با موفقیت اضافه شد ✅");
             ResetForm();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در افزودن: {ex.Message}";
+            Toasts.ShowError($"خطا در افزودن: {ex.Message}");
         }
     }
 
@@ -253,7 +237,7 @@
 
         if (string.IsNullOrWhiteSpace(newName))
         {
-            errorMessage = "نام دسته نمی‌تواند خالی باشد.";
+            Toasts.ShowError("نام دسته نمی‌تواند خالی باشد.");
             return;
         }
 
@@ -262,7 +246,7 @@
             var entity = await Db.Categories.FindAsync(editingCategory.Id);
             if (entity == null)
             {
-                errorMessage = "دسته یافت نشد.";
+                Toasts.ShowError("دسته یافت نشد.");
                 return;
             }
 
@@ -272,12 +256,12 @@
             await Db.SaveChangesAsync();
             await LoadCategories();
 
-            successMessage = $"دسته «{entity.Name}» با موفقیت ویرایش شد ✅";
+            Toasts.ShowSuccess($"دسته «{entity.Name}» با موفقیت ویرایش شد ✅");
             CancelEdit();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در ویرایش: {ex.Message}";
+            Toasts.ShowError($"خطا در ویرایش: {ex.Message}");
         }
     }
 
@@ -309,11 +293,11 @@
             await Db.SaveChangesAsync();
             await LoadCategories();
 
-            successMessage = $"دسته «{item.Name}» حذف شد 🗑️";
+            Toasts.ShowSuccess($"دسته «{item.Name}» حذف شد 🗑️");
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در حذف: {ex.Message}";
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
         }
     }
 
@@ -369,7 +353,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
         }
         finally
         {

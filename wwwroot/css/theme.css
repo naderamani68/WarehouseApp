@@ -277,3 +277,24 @@ body {
         max-width: none;
     }
 }
+
+/* حالت درون‌صفحه‌ای: کنار دکمهٔ ثبت، بدون شناوری */
+.toast-stack-inline {
+    position: static;
+    bottom: auto;
+    left: auto;
+    display: inline-flex;
+    vertical-align: middle;
+    max-width: 460px;
+    margin: 0 0 0 12px;
+}
+
+    .toast-stack-inline .toast-item {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+
+.toast-hint {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}

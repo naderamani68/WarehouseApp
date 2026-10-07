@@ -3,27 +3,13 @@
 @using WarehouseApp.Services
 @using System.Globalization
 @inject ExcelService Excel
+@inject ToastService Toasts
 @using WarehouseApp.Data
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
 @inject IJSRuntime JS
 
 <h3>لیست انبارها</h3>
-
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <div class="alert alert-success alert-dismissible">
-        @successMessage
-        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
-    </div>
-}
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger alert-dismissible">
-        @errorMessage
-        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
-    </div>
-}
 
 @* ===== دکمه‌ی خروجی Excel ===== *@
 <div class="row mb-3">
@@ -127,12 +113,12 @@ else
     <button class="btn btn-success" @onclick="SaveEdit">ذخیره تغییرات</button>
     <button class="btn btn-secondary" @onclick="CancelEdit">انصراف</button>
 }
+@* ===== پیام‌های شناور — کنار دکمهٔ ثبت ===== *@
+<ToastHost Inline="true" />
 
 @code {
     private List<Warehouse> warehouses = new();
     private Warehouse? editingWarehouse;
-    private string? successMessage;
-    private string? errorMessage;
 
     private string? newName;
     private string? newLocation;
@@ -153,7 +139,7 @@ else
     {
         if (string.IsNullOrWhiteSpace(newName))
         {
-            errorMessage = "نام انبار نمی‌تواند خالی باشد";
+            Toasts.ShowError("نام انبار نمی‌تواند خالی باشد");
             return;
         }
 
@@ -171,12 +157,12 @@ else
             await Db.SaveChangesAsync();
             await LoadWarehouses();
 
-            successMessage = $"انبار «{warehouse.Name}» با موفقیت اضافه شد";
+            Toasts.ShowSuccess($"انبار «{warehouse.Name}» با موفقیت اضافه شد");
             ResetForm();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در افزودن: {ex.Message}";
+            Toasts.ShowError($"خطا در افزودن: {ex.Message}");
         }
     }
 
@@ -195,7 +181,7 @@ else
 
         if (string.IsNullOrWhiteSpace(newName))
         {
-            errorMessage = "نام انبار نمی‌تواند خالی باشد";
+            Toasts.ShowError("نام انبار نمی‌تواند خالی باشد");
             return;
         }
 
@@ -210,12 +196,12 @@ else
             await Db.SaveChangesAsync();
             await LoadWarehouses();
 
-            successMessage = $"انبار «{editingWarehouse.Name}» ویرایش شد";
+            Toasts.ShowSuccess($"انبار «{editingWarehouse.Name}» ویرایش شد");
             CancelEdit();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در ویرایش: {ex.Message}";
+            Toasts.ShowError($"خطا در ویرایش: {ex.Message}");
         }
     }
 
@@ -232,11 +218,11 @@ else
             Db.Warehouses.Remove(w);
             await Db.SaveChangesAsync();
             await LoadWarehouses();
-            successMessage = $"انبار «{w.Name}» حذف شد";
+            Toasts.ShowSuccess($"انبار «{w.Name}» حذف شد");
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در حذف: {ex.Message}";
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
         }
     }
 
@@ -284,7 +270,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
         }
         finally
         {

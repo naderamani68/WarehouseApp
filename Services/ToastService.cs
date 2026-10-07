@@ -18,6 +18,9 @@ public class ToastItem
     public Guid Id { get; } = Guid.NewGuid();
     public string Text { get; init; } = string.Empty;
     public ToastKind Kind { get; init; } = ToastKind.Success;
+
+    /// <summary>اگر زمان صفر باشد، پیام ماندگار است و تا بستن کاربر می‌ماند.</summary>
+    public bool Sticky { get; init; }
 }
 
 /// <summary>
@@ -47,7 +50,7 @@ public class ToastService
             return;
         }
 
-        var item = new ToastItem { Text = text, Kind = kind };
+        var item = new ToastItem { Text = text, Kind = kind, Sticky = durationMs <= 0 };
         _items.Add(item);
         OnChange?.Invoke();
 

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using WarehouseApp.Services
 @inject ExcelService Excel
+@inject ToastService Toasts
 @inject IJSRuntime JS
 @using WarehouseApp.Data
 @using Microsoft.EntityFrameworkCore
@@ -10,21 +11,6 @@
 @inject ApplicationDbContext Db
 
 <h3>📦 حرکات انبار</h3>
-
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <div class="alert alert-success alert-dismissible">
-        @successMessage
-        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
-    </div>
-}
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger alert-dismissible">
-        @errorMessage
-        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
-    </div>
-}
 
 <h4>لیست حرکات</h4>
 
@@ -138,6 +124,9 @@
 
         <button class="btn btn-primary" @onclick="AddMovement">ثبت حرکت</button>
 
+@* ===== پیام‌های شناور — کنار دکمهٔ ثبت ===== *@
+<ToastHost Inline="true" />
+
     </div>
 </div>
 
@@ -151,9 +140,6 @@
     private MovementType selectedType = MovementType.In;
     private int quantity;
     private string? note;
-
-    private string? successMessage;
-    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -175,20 +161,20 @@
     {
         if (selectedProductId == 0 || selectedWarehouseId == 0)
         {
-            errorMessage = "لطفاً محصول و انبار را انتخاب کنید";
+            Toasts.ShowError("لطفاً محصول و انبار را انتخاب کنید");
             return;
         }
 
         if (quantity <= 0)
         {
-            errorMessage = "تعداد باید بزرگ‌تر از صفر باشد";
+            Toasts.ShowError("تعداد باید بزرگ‌تر از صفر باشد");
             return;
         }
 
         var product = products.FirstOrDefault(p => p.Id == selectedProductId);
         if (product == null)
         {
-            errorMessage = "محصول انتخاب‌شده پیدا نشد";
+            Toasts.ShowError("محصول انتخاب‌شده پیدا نشد");
             return;
         }
 
@@ -201,7 +187,7 @@
 
             if (currentStockInWarehouse < quantity)
             {
-                errorMessage = $"موجودی کافی نیست. موجودی این محصول در این انبار: {currentStockInWarehouse} عدد";
+                Toasts.ShowError($"موجودی کافی نیست — موجودی این محصول در این انبار: {currentStockInWarehouse} عدد", 0);
                 return;
             }
         }
@@ -233,12 +219,12 @@
             await Db.SaveChangesAsync();
             await LoadAll();
 
-            successMessage = "حرکت با موفقیت ثبت شد ✅";
+            Toasts.ShowSuccess("حرکت با موفقیت ثبت شد ✅");
             ResetForm();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در ثبت حرکت: {ex.Message}";
+            Toasts.ShowError($"خطا در ثبت حرکت: {ex.Message}");
         }
     }
 
@@ -285,7 +271,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
         }
         finally
         {
