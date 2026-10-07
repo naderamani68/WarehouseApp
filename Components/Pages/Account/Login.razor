@@ -1,0 +1,124 @@
+﻿@page "/account/login"
+@layout WarehouseApp.Components.Layout.EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject WarehouseApp.Services.AuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>ورود به سیستم | WarehouseApp</PageTitle>
+
+<div class="text-center mb-4">
+    <div class="auth-logo">📦</div>
+    <h3 class="mt-2 mb-1">سیستم مدیریت انبار</h3>
+    <p class="text-muted small mb-0">برای ادامه، وارد حساب خود شوید</p>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger py-2">@errorMessage</div>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="LoginAsync" FormName="login">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label">نام کاربری</label>
+        <InputText @bind-Value="Input.Username" class="form-control" dir="ltr"
+                   data-latin-only="true" autocomplete="username" />
+        <div class="form-text">نام کاربری با حروف انگلیسی وارد می‌شود</div>
+        <ValidationMessage For="() => Input.Username" class="text-danger small" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">رمز عبور</label>
+        <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" />
+        <ValidationMessage For="() => Input.Password" class="text-danger small" />
+    </div>
+
+    <div class="form-check mb-3">
+        <InputCheckbox @bind-Value="Input.RememberMe" class="form-check-input" id="remember" />
+        <label class="form-check-label" for="remember">مرا به خاطر بسپار</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100">ورود</button>
+</EditForm>
+
+@code {
+    [CascadingParameter] public HttpContext? HttpContext { get; set; }
+
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromForm] private LoginInput Input { get; set; } = new();
+
+    private string? errorMessage;
+
+    public class LoginInput
+    {
+        [Required(ErrorMessage = "نام کاربری را وارد کنید")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "رمز عبور را وارد کنید")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // اگر هنوز هیچ کارمندی ساخته نشده، برو به راه‌اندازی اولیه
+        if (!await Auth.AnyEmployeesAsync())
+        {
+            Nav.NavigateTo("/account/setup", forceLoad: true);
+            return;
+        }
+
+        // اگر کاربر از قبل وارد شده، مستقیم برود به صفحهٔ اصلی
+        if (HttpContext?.User?.Identity?.IsAuthenticated == true)
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        var result = await Auth.ValidateAsync(Input.Username.Trim(), Input.Password);
+
+        if (!result.Success || result.Employee is null)
+        {
+            errorMessage = result.Error ?? "ورود ناموفق بود";
+            return;
+        }
+
+        if (HttpContext is null)
+        {
+            errorMessage = "خطای داخلی: زمینهٔ درخواست در دسترس نیست";
+            return;
+        }
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, result.Employee.Id.ToString()),
+            new(ClaimTypes.Name, result.Employee.Username),
+            new(ClaimTypes.GivenName, result.Employee.FullName),
+            new(ClaimTypes.Role, result.Employee.Role.ToString())
+        };
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties
+            {
+                IsPersistent = Input.RememberMe,
+                ExpiresUtc = Input.RememberMe ? DateTimeOffset.UtcNow.AddDays(14) : null
+            });
+
+        var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : "/" + ReturnUrl.TrimStart('/');
+        Nav.NavigateTo(target, forceLoad: true);
+    }
+}

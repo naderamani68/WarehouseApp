@@ -1,0 +1,128 @@
+﻿@page "/account/setup"
+@layout WarehouseApp.Components.Layout.EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject WarehouseApp.Services.AuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>راه‌اندازی اولیه | WarehouseApp</PageTitle>
+
+<div class="text-center mb-4">
+    <div class="auth-logo">🚀</div>
+    <h3 class="mt-2 mb-1">راه‌اندازی اولیه</h3>
+    <p class="text-muted small mb-0">
+        این صفحه فقط یک‌بار نمایش داده می‌شود.<br />
+        حساب <strong>مدیر سیستم</strong> را بسازید.
+    </p>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger py-2">@errorMessage</div>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="CreateAdminAsync" FormName="setup">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label">نام و نام خانوادگی</label>
+        <InputText @bind-Value="Input.FullName" class="form-control" />
+        <ValidationMessage For="() => Input.FullName" class="text-danger small" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">نام کاربری</label>
+        <InputText @bind-Value="Input.Username" class="form-control" dir="ltr"
+                   data-latin-only="true" autocomplete="username" />
+        <div class="form-text">فقط حروف انگلیسی، عدد، نقطه (.)، خط تیره (-) و زیرخط (_)</div>
+        <ValidationMessage For="() => Input.Username" class="text-danger small" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">رمز عبور</label>
+        <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" />
+        <ValidationMessage For="() => Input.Password" class="text-danger small" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">تکرار رمز عبور</label>
+        <InputText type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" />
+        <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger small" />
+    </div>
+
+    <button type="submit" class="btn btn-success w-100">ساخت مدیر و ورود</button>
+</EditForm>
+
+@code {
+    [CascadingParameter] public HttpContext? HttpContext { get; set; }
+
+    [SupplyParameterFromForm] private SetupInput Input { get; set; } = new();
+
+    private string? errorMessage;
+
+    public class SetupInput
+    {
+        [Required(ErrorMessage = "نام و نام خانوادگی را وارد کنید")]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "نام کاربری را وارد کنید")]
+        [MinLength(3, ErrorMessage = "نام کاربری باید حداقل ۳ کاراکتر باشد")]
+        [RegularExpression("^[A-Za-z0-9._-]+$", ErrorMessage = "نام کاربری فقط می‌تواند شامل حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط باشد")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "رمز عبور را وارد کنید")]
+        [MinLength(6, ErrorMessage = "رمز عبور باید حداقل ۶ کاراکتر باشد")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "تکرار رمز عبور را وارد کنید")]
+        [Compare(nameof(Password), ErrorMessage = "رمز عبور و تکرار آن یکسان نیستند")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // اگر قبلاً راه‌اندازی شده، این صفحه دیگر در دسترس نیست
+        if (await Auth.AnyEmployeesAsync())
+        {
+            Nav.NavigateTo("/account/login", forceLoad: true);
+        }
+    }
+
+    private async Task CreateAdminAsync()
+    {
+        var result = await Auth.CreateFirstAdminAsync(Input.FullName, Input.Username, Input.Password);
+
+        if (!result.Success || result.Employee is null)
+        {
+            errorMessage = result.Error ?? "ساخت مدیر ناموفق بود";
+            return;
+        }
+
+        if (HttpContext is null)
+        {
+            errorMessage = "خطای داخلی: زمینهٔ درخواست در دسترس نیست";
+            return;
+        }
+
+        // بعد از ساخت، همان لحظه وارد می‌شویم
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, result.Employee.Id.ToString()),
+            new(ClaimTypes.Name, result.Employee.Username),
+            new(ClaimTypes.GivenName, result.Employee.FullName),
+            new(ClaimTypes.Role, result.Employee.Role.ToString())
+        };
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity));
+
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+}

@@ -1,0 +1,17 @@
+﻿@* کاربر وارد نشده است → هدایت به صفحهٔ ورود، همراه با آدرس بازگشت *@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var returnUrl = Nav.ToBaseRelativePath(Nav.Uri);
+        var target = "/account/login";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl))
+        {
+            target += "?returnUrl=" + Uri.EscapeDataString(returnUrl);
+        }
+
+        Nav.NavigateTo(target, forceLoad: true);
+    }
+}
