@@ -399,7 +399,7 @@
             .GroupBy(m => new { m.ProductId, m.WarehouseId })
             .Select(g => new InventoryItem
                 {
-                    ProductName = g.First().Product!.Name,
+                    ProductName = g.First().Product!.Name ?? "(بدون نام)",
                     WarehouseName = g.First().Warehouse!.Name,
                     Quantity = g.Sum(m => m.Type == MovementType.In ? m.Quantity : -m.Quantity)
                 })
