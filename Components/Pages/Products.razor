@@ -105,7 +105,7 @@
         @if (pagedProducts.Count == 0)
         {
             <tr>
-                <td colspan="6" class="text-center text-muted">هیچ محصولی وجود ندارد</td>
+                <td colspan="7" class="text-center text-muted">هیچ محصولی وجود ندارد</td>
             </tr>
         }
         else
@@ -128,7 +128,6 @@
                     <td>@(product.Description ?? "-")</td>
                     <td>@product.Quantity</td>
                     <td>
-                    <td>
                         <div class="stock-bar">
                             <div class="stock-bar-fill @GetProgressColor(product)"
                                  style="width: @GetProgressPercent(product)%">
@@ -136,6 +135,7 @@
                         </div>
                         <small class="text-muted">@GetProgressPercent(product)%</small>
                     </td>
+                    <td>
                         <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(product)">ویرایش</button>
                         <button class="btn btn-sm btn-danger" @onclick="() => DeleteProduct(product)">حذف</button>
                     </td>
