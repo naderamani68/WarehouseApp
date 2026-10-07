@@ -1,9 +1,16 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using WarehouseApp.Components;
 using WarehouseApp.Data;
 using WarehouseApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ===== تنظیم لاگ‌گیری =====
+// نویسندهٔ پیش‌فرض «وقایع ویندوز» روی این سیستم اجازهٔ نوشتن ندارد و هنگام
+// ثبت خطا، خودش برنامه را از کار می‌انداخت؛ پس آن را برمی‌داریم.
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
