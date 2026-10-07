@@ -21,6 +21,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<ToastService>();
 
 var app = builder.Build();
 

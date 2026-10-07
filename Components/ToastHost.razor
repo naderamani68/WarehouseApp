@@ -1,0 +1,45 @@
+﻿@* ===== میزبان پیام‌های شناور (Toast) =====
+   این کامپوننت داخل «جزیرهٔ تعاملی» هر صفحه قرار می‌گیرد،
+   چون MainLayout در این پروژه استاتیک است و به رویدادها واکنش نمی‌دهد. *@
+
+@implements IDisposable
+@using WarehouseApp.Services
+@inject ToastService Toasts
+
+<div class="toast-stack">
+    @foreach (var toast in Toasts.Items)
+    {
+        <div class="toast-item toast-@toast.Kind.ToString().ToLowerInvariant()"
+             @onclick="() => Dismiss(toast.Id)">
+            <span class="toast-icon">@IconFor(toast.Kind)</span>
+            <span class="toast-text">@toast.Text</span>
+            <button type="button"
+                    class="toast-close"
+                    title="بستن"
+                    @onclick:stopPropagation="true"
+                    @onclick="() => Dismiss(toast.Id)">✕</button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Toasts.OnChange += HandleChange;
+    }
+
+    // رویداد ممکن است از یک ترد دیگر بیاید (تایمر حذف خودکار)،
+    // پس رندر را روی ترد اصلی مدار می‌بریم.
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private void Dismiss(Guid id) => Toasts.Remove(id);
+
+    private static string IconFor(ToastKind kind) => kind switch
+    {
+        ToastKind.Success => "✅",
+        ToastKind.Error => "⛔",
+        _ => "ℹ️"
+    };
+
+    public void Dispose() => Toasts.OnChange -= HandleChange;
+}

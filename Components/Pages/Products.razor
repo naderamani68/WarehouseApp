@@ -7,25 +7,13 @@
 
 @using WarehouseApp.Services
 @inject ExcelService Excel
+@inject ToastService Toasts
 @inject IJSRuntime JS
 
 <h3>لیست محصولات</h3>
 
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <div class="alert alert-success alert-dismissible">
-        @successMessage
-        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
-    </div>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger alert-dismissible">
-        @errorMessage
-        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
-    </div>
-}
+@* ===== میزبان پیام‌های شناور (Toast) ===== *@
+<ToastHost />
 
 @* ===== نوار فیلترها ===== *@
 <div class="row mb-3">
@@ -212,8 +200,6 @@ else
     private List<Product> products = new();
     private List<Category> categories = new();
     private Product? editingProduct = null;
-    private string? successMessage;
-    private string? errorMessage;
 
     private string? newProductName;
     private string? newProductDescription;
@@ -269,7 +255,7 @@ else
     {
         if (string.IsNullOrWhiteSpace(newProductName))
         {
-            errorMessage = "نام محصول نمی‌تواند خالی باشد";
+            Toasts.ShowError("نام محصول نمی‌تواند خالی باشد");
             return;
         }
 
@@ -287,12 +273,12 @@ else
             await Db.SaveChangesAsync();
             await LoadProducts();
 
-            successMessage = $"محصول «{newProduct.Name}» با موفقیت اضافه شد";
+            Toasts.ShowSuccess($"محصول «{newProduct.Name}» با موفقیت اضافه شد");
             ResetForm();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در افزودن: {ex.Message}";
+            Toasts.ShowError($"خطا در افزودن: {ex.Message}");
         }
     }
 
@@ -309,7 +295,7 @@ else
         if (editingProduct == null) return;
         if (string.IsNullOrWhiteSpace(newProductName))
         {
-            errorMessage = "نام محصول نمی‌تواند خالی باشد";
+            Toasts.ShowError("نام محصول نمی‌تواند خالی باشد");
             return;
         }
 
@@ -323,12 +309,12 @@ else
             await Db.SaveChangesAsync();
             await LoadProducts();
 
-            successMessage = $"محصول «{editingProduct.Name}» ویرایش شد";
+            Toasts.ShowSuccess($"محصول «{editingProduct.Name}» ویرایش شد");
             CancelEdit();
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در ویرایش: {ex.Message}";
+            Toasts.ShowError($"خطا در ویرایش: {ex.Message}");
         }
     }
 
@@ -345,11 +331,11 @@ else
             Db.Products.Remove(product);
             await Db.SaveChangesAsync();
             await LoadProducts();
-            successMessage = $"محصول «{product.Name}» حذف شد";
+            Toasts.ShowSuccess($"محصول «{product.Name}» حذف شد");
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در حذف: {ex.Message}";
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
         }
     }
 
@@ -416,7 +402,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
         }
         finally
         {
