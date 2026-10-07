@@ -13,6 +13,8 @@ namespace WarehouseApp.Data
         public DbSet<Warehouse> Warehouses { get; set; }
         public DbSet<StockMovement> StockMovements { get; set; }
         public DbSet<Category> Categories { get; set; }    // 👈 خط جدید
+        public DbSet<Employee> Employees { get; set; }   // کارمندان
+        public DbSet<AuditLog> AuditLogs { get; set; }   // تاریخچهٔ عملیات
 
         // 👇 متد جدید برای تنظیم رفتار حذف دسته
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -24,6 +26,15 @@ namespace WarehouseApp.Data
                 .WithMany(c => c.Products)
                 .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // نام کاربری و کد پرسنلی هر کارمند باید یکتا باشد
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.Username)
+                .IsUnique();
+
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.EmployeeCode)
+                .IsUnique();
         }
     }
 }
