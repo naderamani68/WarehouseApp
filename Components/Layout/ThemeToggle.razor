@@ -1,0 +1,22 @@
+﻿@rendermode InteractiveServer
+@inject WarehouseApp.Services.ThemeService ThemeService
+
+<button class="theme-toggle" @onclick="ToggleTheme" title="تغییر تم روشن/تیره">
+    @(ThemeService.CurrentTheme == "dark" ? "☀️" : "🌙")
+</button>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ThemeService.InitializeAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        await ThemeService.ToggleAsync();
+    }
+}

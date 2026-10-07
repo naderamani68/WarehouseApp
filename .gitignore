@@ -1,0 +1,41 @@
+# ====================================================
+#  .gitignore — فهرست چیزهایی که گیت نباید ثبت کند
+#  ساخته‌شده برای پروژهٔ WarehouseApp (Blazor / .NET 8)
+# ====================================================
+
+# ---------- ۱) خروجی بیلد .NET ----------
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# ---------- ۲) Visual Studio ----------
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# ---------- ۳) ابزارهای دیگر ----------
+.idea/
+.vscode/
+
+# ---------- ۴) فایل‌های لاگ ----------
+*.log
+logs/
+log/
+
+# ---------- ۵) سیستمعامل ----------
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

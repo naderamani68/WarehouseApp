@@ -1,0 +1,448 @@
+﻿@page "/products"
+@rendermode InteractiveServer
+@using System.Globalization
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+@using WarehouseApp.Services
+@inject ExcelService Excel
+@inject IJSRuntime JS
+
+<h3>لیست محصولات</h3>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@* ===== نوار فیلترها ===== *@
+<div class="row mb-3">
+    <div class="col-md-4">
+        <input class="form-control" placeholder="🔍 جستجو در نام یا توضیحات..."
+               @bind="searchTerm" @bind:event="oninput" />
+    </div>
+    <div class="col-md-4">
+        <select class="form-select" @bind="categoryFilter">
+            <option value="">— همه دسته‌ها —</option>
+            <option value="0">— بدون دسته —</option>
+            @foreach (var cat in categories)
+            {
+                <option value="@cat.Id">@cat.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <select class="form-select" @bind="pageSize">
+            <option value="5">۵ در صفحه</option>
+            <option value="10">۱۰ در صفحه</option>
+            <option value="20">۲۰ در صفحه</option>
+            <option value="50">۵۰ در صفحه</option>
+        </select>
+    </div>
+</div>
+
+@* ===== دکمه‌ی خروجی Excel + راهنما ===== *@
+<div class="row mb-3 align-items-center">
+    <div class="col-md-8">
+        <details class="stock-help">
+            <summary>❓ راهنمای وضعیت موجودی</summary>
+            <div class="stock-help-content">
+                <p class="mb-2">
+                    📊 نوار موجودی نشون می‌ده هر محصول <strong>چقدر از بیشترین موجودی جدول</strong> رو داره.
+                </p>
+                <ul class="mb-2">
+                    <li>🟢 <strong>سبز (۶۷٪ تا ۱۰۰٪)</strong> — موجودی خوب</li>
+                    <li>🟡 <strong>زرد (۳۴٪ تا ۶۶٪)</strong> — موجودی متوسط</li>
+                    <li>🔴 <strong>قرمز (۰٪ تا ۳۳٪)</strong> — موجودی کم</li>
+                </ul>
+                <p class="mb-0 text-muted small">
+                    💡 <strong>مثال:</strong> اگه بیشترین موجودی یه کالا ۱۰۰ عدد باشه،
+                    کالایی با ۲۵ عدد → <strong>۲۵٪</strong> → 🔴 قرمز
+                </p>
+            </div>
+        </details>
+    </div>
+    <div class="col-md-4 text-end">
+        <button class="btn btn-success" @onclick="ExportExcel" disabled="@isExporting">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+</div>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>شناسه</th>
+            <th>نام</th>
+            <th>دسته</th>
+            <th>توضیحات</th>
+            <th>موجودی کل</th>
+            <th>وضعیت موجودی</th>
+            <th>عملیات</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (pagedProducts.Count == 0)
+        {
+            <tr>
+                <td colspan="6" class="text-center text-muted">هیچ محصولی وجود ندارد</td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var product in pagedProducts)
+            {
+                <tr>
+                    <td>@product.Id</td>
+                    <td>@product.Name</td>
+                    <td>
+                        @if (product.Category != null)
+                        {
+                            <span class="badge bg-info text-dark">@product.Category.Name</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">— بدون دسته —</span>
+                        }
+                    </td>
+                    <td>@(product.Description ?? "-")</td>
+                    <td>@product.Quantity</td>
+                    <td>
+                    <td>
+                        <div class="stock-bar">
+                            <div class="stock-bar-fill @GetProgressColor(product)"
+                                 style="width: @GetProgressPercent(product)%">
+                            </div>
+                        </div>
+                        <small class="text-muted">@GetProgressPercent(product)%</small>
+                    </td>
+                        <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(product)">ویرایش</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteProduct(product)">حذف</button>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@if (totalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => currentPage--">قبلی</button>
+            </li>
+
+            @for (int i = 1; i <= totalPages; i++)
+            {
+                var pageNum = i;
+                <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                    <button class="page-link" @onclick="() => currentPage = pageNum">@pageNum</button>
+                </li>
+            }
+
+            <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => currentPage++">بعدی</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+<h3>@(editingProduct == null ? "افزودن محصول جدید" : $"ویرایش محصول: {editingProduct.Name}")</h3>
+
+<div class="mb-3">
+    <label class="form-label">نام محصول:</label>
+    <input class="form-control" @bind="newProductName" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">دسته‌بندی:</label>
+    <select class="form-select" @bind="newProductCategoryId">
+        <option value="">— بدون دسته —</option>
+        @foreach (var cat in categories)
+        {
+            <option value="@cat.Id">@cat.Name</option>
+        }
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">توضیحات:</label>
+    <input class="form-control" @bind="newProductDescription" />
+</div>
+
+@if (editingProduct == null)
+{
+    <button class="btn btn-primary" @onclick="AddProduct">افزودن</button>
+}
+else
+{
+    <button class="btn btn-success" @onclick="SaveEdit">ذخیره تغییرات</button>
+    <button class="btn btn-secondary" @onclick="CancelEdit">انصراف</button>
+}
+
+<div class="alert alert-info mt-3">
+    💡 <strong>توجه:</strong> موجودی محصول از طریق ثبت «حرکات انبار» قابل افزایش یا کاهش است.
+    بعد از افزودن محصول، از منوی «حرکات انبار» استفاده کنید.
+</div>
+
+
+
+@code {
+    private List<Product> products = new();
+    private List<Category> categories = new();
+    private Product? editingProduct = null;
+    private string? successMessage;
+    private string? errorMessage;
+
+    private string? newProductName;
+    private string? newProductDescription;
+    private int? newProductCategoryId;    
+    private string? searchTerm;
+    private string? categoryFilter;      
+    private int pageSize = 10;
+    private int currentPage = 1;
+    private int _maxQuantity = 1;         // 👈 بیشترین موجودی جدول (برای Progress Bar)
+
+    private List<Product> filteredProducts =>
+        products
+            .Where(p =>
+                (string.IsNullOrWhiteSpace(searchTerm) ||
+                 (p.Name != null && p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                 (p.Description != null && p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                &&
+                (string.IsNullOrEmpty(categoryFilter) ||
+                 (categoryFilter == "0" && p.CategoryId == null) ||
+                 (categoryFilter != "0" && p.CategoryId != null && p.CategoryId.ToString() == categoryFilter))
+            )
+            .ToList();
+
+    private List<Product> pagedProducts =>
+        filteredProducts.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+
+    private int totalPages =>
+        (int)Math.Ceiling((double)filteredProducts.Count / pageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+        await LoadProducts();
+    }
+
+    private async Task LoadCategories()
+    {
+        categories = await Db.Categories.OrderBy(c => c.Name).ToListAsync();
+    }
+
+    private async Task LoadProducts()
+    {
+        products = await Db.Products
+            .Include(p => p.Category)     // 👈 برای نمایش نام دسته
+            .OrderBy(p => p.Id)
+            .ToListAsync();
+
+        _maxQuantity = products.Any() ? products.Max(p => p.Quantity) : 1;
+        if (_maxQuantity < 1) _maxQuantity = 1;
+    }
+
+    private async Task AddProduct()
+    {
+        if (string.IsNullOrWhiteSpace(newProductName))
+        {
+            errorMessage = "نام محصول نمی‌تواند خالی باشد";
+            return;
+        }
+
+        try
+        {
+            var newProduct = new Product
+                {
+                    Name = newProductName,
+                    Description = newProductDescription,
+                    Quantity = 0,
+                    CategoryId = newProductCategoryId      // 👈 اضافه شد
+                };
+
+            Db.Products.Add(newProduct);
+            await Db.SaveChangesAsync();
+            await LoadProducts();
+
+            successMessage = $"محصول «{newProduct.Name}» با موفقیت اضافه شد";
+            ResetForm();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در افزودن: {ex.Message}";
+        }
+    }
+
+    private void StartEdit(Product product)
+    {
+        editingProduct = product;
+        newProductName = product.Name;
+        newProductDescription = product.Description;
+        newProductCategoryId = product.CategoryId;    // 👈 اضافه شد
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingProduct == null) return;
+        if (string.IsNullOrWhiteSpace(newProductName))
+        {
+            errorMessage = "نام محصول نمی‌تواند خالی باشد";
+            return;
+        }
+
+        try
+        {
+            editingProduct.Name = newProductName;
+            editingProduct.Description = newProductDescription;
+            editingProduct.CategoryId = newProductCategoryId;    // 👈 اضافه شد
+
+            Db.Products.Update(editingProduct);
+            await Db.SaveChangesAsync();
+            await LoadProducts();
+
+            successMessage = $"محصول «{editingProduct.Name}» ویرایش شد";
+            CancelEdit();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در ویرایش: {ex.Message}";
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingProduct = null;
+        ResetForm();
+    }
+
+    private async Task DeleteProduct(Product product)
+    {
+        try
+        {
+            Db.Products.Remove(product);
+            await Db.SaveChangesAsync();
+            await LoadProducts();
+            successMessage = $"محصول «{product.Name}» حذف شد";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در حذف: {ex.Message}";
+        }
+    }
+
+    private void ResetForm()
+    {
+        newProductName = string.Empty;
+        newProductDescription = string.Empty;
+        newProductCategoryId = null;    // 👈 اضافه شد
+    }
+
+    private bool isExporting = false;
+
+    private async Task ExportExcel()
+    {
+        try
+        {
+            isExporting = true;
+
+            // ✅ فقط محصولات فیلترشده
+            var data = filteredProducts;
+
+            var columns = new Dictionary<string, Func<Product, object?>>
+                {
+                    ["کد"] = p => p.Id,
+                    ["نام کالا"] = p => p.Name,
+                    ["دسته"] = p => p.Category != null ? p.Category.Name : "—",
+                    ["موجودی"] = p => p.Quantity,
+                    ["توضیحات"] = p => p.Description
+                };
+
+            // ===== ساخت عنوان پویا =====
+            var titleParts = new List<string> { "گزارش کالاها" };
+
+            // فیلتر دسته
+            if (!string.IsNullOrWhiteSpace(categoryFilter))
+            {
+                var catName = categoryFilter == "0"
+                    ? "بدون دسته"
+                    : categories.FirstOrDefault(c => c.Id.ToString() == categoryFilter)?.Name ?? "؟";
+                titleParts.Add($"دسته: {catName}");
+            }
+
+            // فیلتر جستجو
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                titleParts.Add($"جستجو: «{searchTerm}»");
+            }
+
+            // تاریخ شمسی
+            titleParts.Add($"تاریخ: {GetPersianDateTimeString()}");
+
+            var title = string.Join("  |  ", titleParts);
+
+            // ===== خروجی =====
+            var bytes = Excel.Export(data, "کالاها", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            // نام فایل هم تاریخ شمسی داشته باشه
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+            var fileName = $"Products_{pc.GetYear(now):0000}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+    private string GetPersianDateTimeString()
+    {
+        var pc = new PersianCalendar();
+        var now = DateTime.Now;
+        return $"{pc.GetYear(now):0000}/{pc.GetMonth(now):00}/{pc.GetDayOfMonth(now):00} - {now:HH:mm}";
+    }
+
+        private int GetProgressPercent(Product p)
+    {
+        if (_maxQuantity <= 0) return 0;
+        var percent = (int)Math.Round((double)p.Quantity / _maxQuantity * 100);
+        return Math.Clamp(percent, 0, 100);
+    }
+
+    private string GetProgressColor(Product p)
+    {
+        var percent = GetProgressPercent(p);
+        if (percent <= 33) return "stock-bar-red";
+        if (percent <= 66) return "stock-bar-yellow";
+        return "stock-bar-green";
+    }
+
+}

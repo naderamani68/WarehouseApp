@@ -1,0 +1,301 @@
+﻿@page "/warehouses"
+@rendermode InteractiveServer
+@using WarehouseApp.Services
+@using System.Globalization
+@inject ExcelService Excel
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject IJSRuntime JS
+
+<h3>لیست انبارها</h3>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@* ===== دکمه‌ی خروجی Excel ===== *@
+<div class="row mb-3">
+    <div class="col-12 text-end">
+        <button class="btn btn-success" @onclick="ExportExcel" disabled="@isExporting">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>شناسه</th>
+            <th>نام</th>
+            <th>موقعیت</th>
+            <th>توضیحات</th>
+            <th>وضعیت</th>
+            <th>عملیات</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (warehouses.Count == 0)
+        {
+            <tr>
+                <td colspan="6" class="text-center text-muted">هیچ انباری وجود ندارد</td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var w in warehouses)
+            {
+                <tr>
+                    <td>@w.Id</td>
+                    <td>@w.Name</td>
+                    <td>@(w.Location ?? "-")</td>
+                    <td>@(w.Description ?? "-")</td>
+                    <td>
+                        @if (w.IsActive)
+                        {
+                            <span class="badge bg-success">فعال</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">غیرفعال</span>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(w)">
+                            ویرایش
+                        </button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteWarehouse(w)">
+                            حذف
+                        </button>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+<h3>@(editingWarehouse == null ? "افزودن انبار جدید" : $"ویرایش انبار: {editingWarehouse.Name}")</h3>
+
+<div class="mb-3">
+    <label class="form-label">نام انبار:</label>
+    <input class="form-control" @bind="newName" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">موقعیت:</label>
+    <input class="form-control" @bind="newLocation" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">توضیحات:</label>
+    <input class="form-control" @bind="newDescription" />
+</div>
+
+<div class="mb-3 form-check">
+    <input class="form-check-input" type="checkbox" @bind="newIsActive" id="isActiveCheck" />
+    <label class="form-check-label" for="isActiveCheck">
+        فعال
+    </label>
+</div>
+
+@if (editingWarehouse == null)
+{
+    <button class="btn btn-primary" @onclick="AddWarehouse">افزودن</button>
+}
+else
+{
+    <button class="btn btn-success" @onclick="SaveEdit">ذخیره تغییرات</button>
+    <button class="btn btn-secondary" @onclick="CancelEdit">انصراف</button>
+}
+
+@code {
+    private List<Warehouse> warehouses = new();
+    private Warehouse? editingWarehouse;
+    private string? successMessage;
+    private string? errorMessage;
+
+    private string? newName;
+    private string? newLocation;
+    private string? newDescription;
+    private bool newIsActive = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWarehouses();
+    }
+
+    private async Task LoadWarehouses()
+    {
+        warehouses = await Db.Warehouses.OrderBy(w => w.Id).ToListAsync();
+    }
+
+    private async Task AddWarehouse()
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            errorMessage = "نام انبار نمی‌تواند خالی باشد";
+            return;
+        }
+
+        try
+        {
+            var warehouse = new Warehouse
+                {
+                    Name = newName,
+                    Location = newLocation,
+                    Description = newDescription,
+                    IsActive = newIsActive
+                };
+
+            Db.Warehouses.Add(warehouse);
+            await Db.SaveChangesAsync();
+            await LoadWarehouses();
+
+            successMessage = $"انبار «{warehouse.Name}» با موفقیت اضافه شد";
+            ResetForm();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در افزودن: {ex.Message}";
+        }
+    }
+
+    private void StartEdit(Warehouse w)
+    {
+        editingWarehouse = w;
+        newName = w.Name;
+        newLocation = w.Location;
+        newDescription = w.Description;
+        newIsActive = w.IsActive;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingWarehouse == null) return;
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            errorMessage = "نام انبار نمی‌تواند خالی باشد";
+            return;
+        }
+
+        try
+        {
+            editingWarehouse.Name = newName;
+            editingWarehouse.Location = newLocation;
+            editingWarehouse.Description = newDescription;
+            editingWarehouse.IsActive = newIsActive;
+
+            Db.Warehouses.Update(editingWarehouse);
+            await Db.SaveChangesAsync();
+            await LoadWarehouses();
+
+            successMessage = $"انبار «{editingWarehouse.Name}» ویرایش شد";
+            CancelEdit();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در ویرایش: {ex.Message}";
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingWarehouse = null;
+        ResetForm();
+    }
+
+    private async Task DeleteWarehouse(Warehouse w)
+    {
+        try
+        {
+            Db.Warehouses.Remove(w);
+            await Db.SaveChangesAsync();
+            await LoadWarehouses();
+            successMessage = $"انبار «{w.Name}» حذف شد";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در حذف: {ex.Message}";
+        }
+    }
+
+    private void ResetForm()
+    {
+        newName = string.Empty;
+        newLocation = string.Empty;
+        newDescription = string.Empty;
+        newIsActive = true;
+    }
+
+    private bool isExporting = false;
+
+    private async Task ExportExcel()
+    {
+        try
+        {
+            isExporting = true;
+
+            // ✅ همه‌ی انبارها (این صفحه فیلتر نداره)
+            var data = warehouses;
+
+            var columns = new Dictionary<string, Func<Warehouse, object?>>
+                {
+                    ["کد"] = w => w.Id,
+                    ["نام انبار"] = w => w.Name,
+                    ["موقعیت"] = w => w.Location,
+                    ["توضیحات"] = w => w.Description,
+                    ["وضعیت"] = w => w.IsActive ? "فعال" : "غیرفعال"
+                };
+
+            // ===== ساخت عنوان پویا =====
+            var title = $"گزارش انبارها  |  تاریخ: {GetPersianDateTimeString()}";
+
+            // ===== خروجی =====
+            var bytes = Excel.Export(data, "انبارها", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            // نام فایل با تاریخ شمسی
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+            var fileName = $"Warehouses_{pc.GetYear(now):0000}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private string GetPersianDateTimeString()
+    {
+        var pc = new PersianCalendar();
+        var now = DateTime.Now;
+        return $"{pc.GetYear(now):0000}/{pc.GetMonth(now):00}/{pc.GetDayOfMonth(now):00} - {now:HH:mm}";
+    }
+}

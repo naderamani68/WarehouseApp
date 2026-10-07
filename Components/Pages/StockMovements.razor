@@ -1,0 +1,308 @@
+﻿@page "/movements"
+@rendermode InteractiveServer
+@using WarehouseApp.Services
+@inject ExcelService Excel
+@inject IJSRuntime JS
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+
+@inject ApplicationDbContext Db
+
+<h3>📦 حرکات انبار</h3>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+<h4>لیست حرکات</h4>
+
+<div class="row mb-3">
+    <div class="col-12 text-end">
+        <button class="btn btn-success" @onclick="ExportExcel" disabled="@isExporting">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>تاریخ</th>
+            <th>محصول</th>
+            <th>انبار</th>
+            <th>نوع</th>
+            <th>تعداد</th>
+            <th>یادداشت</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (movements.Count == 0)
+        {
+            <tr>
+                <td colspan="6" class="text-center text-muted">هیچ حرکتی ثبت نشده است</td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var m in movements)
+            {
+                <tr>
+                    <td>@ToPersianDateTime(m.MovementDate)</td>
+                    <td>@(m.Product?.Name ?? "-")</td>
+                    <td>@(m.Warehouse?.Name ?? "-")</td>
+                    <td>
+                        @if (m.Type == MovementType.In)
+                        {
+                            <span class="badge bg-success">ورود</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">خروج</span>
+                        }
+                    </td>
+                    <td>@m.Quantity</td>
+                    <td>@(m.Note ?? "-")</td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+<hr />
+
+<h4>ثبت حرکت جدید</h4>
+
+<div class="row">
+    <div class="col-md-6">
+
+        <div class="mb-3">
+            <label class="form-label">محصول:</label>
+            <select class="form-select" @bind="selectedProductId">
+                <option value="0">-- انتخاب کنید --</option>
+                @foreach (var p in products)
+                {
+                    <option value="@p.Id">@p.Name (موجودی فعلی: @p.Quantity)</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">انبار:</label>
+            <select class="form-select" @bind="selectedWarehouseId">
+                <option value="0">-- انتخاب کنید --</option>
+                @foreach (var w in warehouses)
+                {
+                    <option value="@w.Id">@w.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">نوع حرکت:</label>
+            <select class="form-select" @bind="selectedType">
+                <option value="@MovementType.In">ورود</option>
+                <option value="@MovementType.Out">خروج</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">تعداد:</label>
+            <input class="form-control" type="number" @bind="quantity" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">یادداشت:</label>
+            <input class="form-control" @bind="note" />
+        </div>
+
+        <button class="btn btn-primary" @onclick="AddMovement">ثبت حرکت</button>
+
+    </div>
+</div>
+
+@code {
+    private List<StockMovement> movements = new();
+    private List<Product> products = new();
+    private List<Warehouse> warehouses = new();
+
+    private int selectedProductId;
+    private int selectedWarehouseId;
+    private MovementType selectedType = MovementType.In;
+    private int quantity;
+    private string? note;
+
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
+
+    private async Task LoadAll()
+    {
+        products = await Db.Products.OrderBy(p => p.Name).ToListAsync();
+        warehouses = await Db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync();
+        movements = await Db.StockMovements
+            .Include(m => m.Product)
+            .Include(m => m.Warehouse)
+            .OrderByDescending(m => m.MovementDate)
+            .ToListAsync();
+    }
+
+    private async Task AddMovement()
+    {
+        if (selectedProductId == 0 || selectedWarehouseId == 0)
+        {
+            errorMessage = "لطفاً محصول و انبار را انتخاب کنید";
+            return;
+        }
+
+        if (quantity <= 0)
+        {
+            errorMessage = "تعداد باید بزرگ‌تر از صفر باشد";
+            return;
+        }
+
+        var product = products.FirstOrDefault(p => p.Id == selectedProductId);
+        if (product == null)
+        {
+            errorMessage = "محصول انتخاب‌شده پیدا نشد";
+            return;
+        }
+
+        if (selectedType == MovementType.Out)
+        {
+            // موجودی این محصول در این انبار خاص رو حساب کن
+            var currentStockInWarehouse = await Db.StockMovements
+                .Where(m => m.ProductId == selectedProductId && m.WarehouseId == selectedWarehouseId)
+                .SumAsync(m => m.Type == MovementType.In ? m.Quantity : -m.Quantity);
+
+            if (currentStockInWarehouse < quantity)
+            {
+                errorMessage = $"موجودی کافی نیست. موجودی این محصول در این انبار: {currentStockInWarehouse} عدد";
+                return;
+            }
+        }
+
+        try
+        {
+            var movement = new StockMovement
+                {
+                    ProductId = selectedProductId,
+                    WarehouseId = selectedWarehouseId,
+                    Type = selectedType,
+                    Quantity = quantity,
+                    Note = note,
+                    MovementDate = DateTime.Now
+                };
+
+            // آپدیت موجودی محصول
+            if (selectedType == MovementType.In)
+            {
+                product.Quantity += quantity;
+            }
+            else
+            {
+                product.Quantity -= quantity;
+            }
+
+            Db.StockMovements.Add(movement);
+            Db.Products.Update(product);
+            await Db.SaveChangesAsync();
+            await LoadAll();
+
+            successMessage = "حرکت با موفقیت ثبت شد ✅";
+            ResetForm();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در ثبت حرکت: {ex.Message}";
+        }
+    }
+
+    private void ResetForm()
+    {
+        selectedProductId = 0;
+        selectedWarehouseId = 0;
+        selectedType = MovementType.In;
+        quantity = 0;
+        note = null;
+    }
+
+    private bool isExporting = false;
+
+    private async Task ExportExcel()
+    {
+        try
+        {
+            isExporting = true;
+
+            var data = movements;   // لیست لود شده (همه‌ی حرکات، مرتب‌شده نزولی بر اساس تاریخ)
+
+            var columns = new Dictionary<string, Func<StockMovement, object?>>
+                {
+                    ["کد"] = m => m.Id,
+                    ["تاریخ"] = m => m.MovementDate,   // ✅ خودکار شمسی می‌شه
+                    ["محصول"] = m => m.Product != null ? m.Product.Name : "—",
+                    ["انبار"] = m => m.Warehouse != null ? m.Warehouse.Name : "—",
+                    ["نوع"] = m => m.Type == MovementType.In ? "ورود" : "خروج",
+                    ["تعداد"] = m => m.Quantity,
+                    ["یادداشت"] = m => m.Note
+                };
+
+            var title = $"گزارش حرکات انبار  |  تاریخ: {GetPersianDateTimeString()}";
+
+            var bytes = Excel.Export(data, "حرکات انبار", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+            var fileName = $"Movements_{pc.GetYear(now):0000}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"خطا در خروجی Excel: {ex.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private string GetPersianDateTimeString()
+    {
+        var pc = new PersianCalendar();
+        var now = DateTime.Now;
+        return $"{pc.GetYear(now):0000}/{pc.GetMonth(now):00}/{pc.GetDayOfMonth(now):00} - {now:HH:mm}";
+    }
+
+    private string ToPersianDateTime(DateTime dt)
+    {
+        var pc = new PersianCalendar();
+        return $"{pc.GetYear(dt):0000}/{pc.GetMonth(dt):00}/{pc.GetDayOfMonth(dt):00} {dt:HH:mm}";
+    }
+}

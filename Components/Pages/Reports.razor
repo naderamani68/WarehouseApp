@@ -1,0 +1,251 @@
+﻿@page "/reports"
+@rendermode InteractiveServer
+
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<h3>📊 داشبورد گزارش‌ها</h3>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">📦 تعداد محصولات</h5>
+                <p class="card-text display-4">@totalProducts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">🏭 تعداد انبارها</h5>
+                <p class="card-text display-4">@totalWarehouses</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">📊 کل موجودی</h5>
+                <p class="card-text display-4">@totalStock</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">📥 ورودهای امروز</h5>
+                <p class="card-text display-5">@todayIn</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h5 class="card-title">📤 خروج‌های امروز</h5>
+                <p class="card-text display-5">@todayOut</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-warning">
+        <h5>⚠️ محصولات کم‌موجود (کمتر از ۵)</h5>
+    </div>
+    <div class="card-body">
+        @if (lowStockProducts.Count == 0)
+        {
+            <p class="text-muted">همه‌ی محصولات موجودی کافی دارند ✅</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>نام محصول</th>
+                        <th>توضیحات</th>
+                        <th>موجودی</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in lowStockProducts)
+                    {
+                        <tr>
+                            <td>@p.Name</td>
+                            <td>@(p.Description ?? "-")</td>
+                            <td><strong class="text-danger">@p.Quantity</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5>📈 ۱۰ حرکت اخیر</h5>
+    </div>
+    <div class="card-body">
+        @if (recentMovements.Count == 0)
+        {
+            <p class="text-muted">هنوز حرکتی ثبت نشده است</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>تاریخ</th>
+                        <th>محصول</th>
+                        <th>انبار</th>
+                        <th>نوع</th>
+                        <th>تعداد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in recentMovements)
+                    {
+                        <tr>
+                            <td>@m.MovementDate.ToString("MM/dd HH:mm")</td>
+                            <td>@(m.Product?.Name ?? "-")</td>
+                            <td>@(m.Warehouse?.Name ?? "-")</td>
+                            <td>
+                                @if (m.Type == MovementType.In)
+                                {
+                                    <span class="badge bg-success">ورود</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">خروج</span>
+                                }
+                            </td>
+                            <td>@m.Quantity</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5>🏆 محصولات پرفروش (بیشترین خروج)</h5>
+    </div>
+    <div class="card-body">
+        @if (topProducts.Count == 0)
+        {
+            <p class="text-muted">هنوز خروجی ثبت نشده است</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>نام محصول</th>
+                        <th>مجموع خروج</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        int rank = 1;
+                    }
+                    @foreach (var item in topProducts)
+                    {
+                        <tr>
+                            <td>@rank</td>
+                            <td>@item.ProductName</td>
+                            <td><strong>@item.TotalOut</strong></td>
+                        </tr>
+                        rank++;
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private int totalProducts;
+    private int totalWarehouses;
+    private int totalStock;
+    private int todayIn;
+    private int todayOut;
+
+    private List<Product> lowStockProducts = new();
+    private List<StockMovement> recentMovements = new();
+    private List<TopProductItem> topProducts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // آمار کلی
+        totalProducts = await Db.Products.CountAsync();
+        totalWarehouses = await Db.Warehouses.CountAsync();
+        totalStock = await Db.Products.SumAsync(p => (int?)p.Quantity) ?? 0;
+
+        // ورود/خروج امروز
+        var today = DateTime.Today;
+        var tomorrow = today.AddDays(1);
+
+        todayIn = await Db.StockMovements
+            .Where(m => m.Type == MovementType.In
+                     && m.MovementDate >= today
+                     && m.MovementDate < tomorrow)
+            .SumAsync(m => (int?)m.Quantity) ?? 0;
+
+        todayOut = await Db.StockMovements
+            .Where(m => m.Type == MovementType.Out
+                     && m.MovementDate >= today
+                     && m.MovementDate < tomorrow)
+            .SumAsync(m => (int?)m.Quantity) ?? 0;
+
+        // محصولات کم‌موجود
+        lowStockProducts = await Db.Products
+            .Where(p => p.Quantity < 5)
+            .OrderBy(p => p.Quantity)
+            .ToListAsync();
+
+        // ۱۰ حرکت اخیر
+        recentMovements = await Db.StockMovements
+            .Include(m => m.Product)
+            .Include(m => m.Warehouse)
+            .OrderByDescending(m => m.MovementDate)
+            .Take(10)
+            .ToListAsync();
+
+        // محصولات پرفروش
+        var grouped = await Db.StockMovements
+            .Where(m => m.Type == MovementType.Out)
+            .Include(m => m.Product)
+            .GroupBy(m => m.Product!.Name)
+            .Select(g => new
+            {
+                ProductName = g.Key ?? "-",
+                TotalOut = g.Sum(x => x.Quantity)
+            })
+            .OrderByDescending(x => x.TotalOut)
+            .Take(5)
+            .ToListAsync();
+
+        topProducts = grouped
+            .Select(x => new TopProductItem
+                {
+                    ProductName = x.ProductName,
+                    TotalOut = x.TotalOut
+                })
+            .ToList();
+    }
+
+    private class TopProductItem
+    {
+        public string ProductName { get; set; } = string.Empty;
+        public int TotalOut { get; set; }
+    }
+}

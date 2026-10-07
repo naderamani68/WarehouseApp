@@ -1,0 +1,84 @@
+﻿@inherits LayoutComponentBase
+@using System.Globalization
+@implements IDisposable
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 d-flex justify-content-between align-items-center">
+
+            @* ===== سمت راست: دکمه خانه + نام اپ ===== *@
+            <div class="d-flex align-items-center gap-3">
+                <a class="btn btn-sm btn-outline-primary" href="/" title="بازگشت به صفحه اصلی">
+                    <i class="bi bi-house-door-fill me-1"></i>
+                    خانه
+                </a>
+                <span class="text-muted small">سیستم مدیریت انبار</span>
+            </div>
+
+            @* ===== سمت چپ: تم + تاریخ و ساعت زنده ===== *@
+            <div class="d-flex align-items-center gap-3">
+
+                @* دکمه سوییچ تم (کامپوننت مستقل با rendermode خودش) *@
+                <ThemeToggle />
+
+                <span class="text-muted small">
+                    <i class="bi bi-calendar3 me-1"></i>
+                    @PersianDateString
+                </span>
+            </div>
+
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    خطای غیرمنتظره‌ای رخ داد.
+    <a href="" class="reload">بارگذاری مجدد</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private System.Threading.Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        // هر ۳۰ ثانیه یک‌بار آپدیت می‌کنه
+        _timer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+    }
+
+    private string PersianDateString
+    {
+        get
+        {
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+
+            int year = pc.GetYear(now);
+            int month = pc.GetMonth(now);
+            int day = pc.GetDayOfMonth(now);
+            int hour = now.Hour;
+            int minute = now.Minute;
+
+            string[] weekDays = { "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه" };
+            string dayName = weekDays[(int)now.DayOfWeek];
+
+            return $"{dayName} {year}/{month:00}/{day:00} - {hour:00}:{minute:00}";
+        }
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

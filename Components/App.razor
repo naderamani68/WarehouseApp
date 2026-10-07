@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+
+    @* ===== فونت وزیرمتن ===== *@
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css"
+          rel="stylesheet" type="text/css" />
+
+    @* ===== Bootstrap Icons ===== *@
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    
+    <link rel="stylesheet" href="WarehouseApp.styles.css" />
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+
+       @* اعمال تم قبل از رندر — جلوگیری از پرش اولیه *@
+    <script>
+        (function () {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+
+    <script src="_framework/blazor.web.js"></script>
+
+    @* 🔧 اعمال مجدد تم بعد از هر Navigation — رفع مشکل تغییر تم بین صفحات *@
+    <script>
+        function reapplyTheme() {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        }
+
+        Blazor.addEventListener('enhancedload', reapplyTheme);
+    </script>
+
+    <script src="js/fileDownload.js"></script>
+
+    <script src="_content/Blazor-ApexCharts/js/apexcharts.esm.js" type="module"></script>
+    <script src="_content/Blazor-ApexCharts/js/blazor-apexcharts.js" type="module"></script>
+
+</body>
+
+</html>

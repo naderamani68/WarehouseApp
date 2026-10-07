@@ -1,0 +1,607 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject ApplicationDbContext Db
+@using WarehouseApp.Services
+@using System.Globalization
+@inject ExcelService Excel
+@inject IJSRuntime JS
+
+
+<PageTitle>داشبورد | WarehouseApp</PageTitle>
+
+<div class="container-fluid">
+
+    @* ===== عنوان خوش‌آمد ===== *@
+    <div class="mb-4">
+        <h2>👋 سلام، خوش آمدید!</h2>
+        <p class="text-muted">به سیستم مدیریت انبار خوش آمدید. از میانبرهای زیر استفاده کنید.</p>
+    </div>
+
+    @* ===== کارت‌های میانبر ===== *@
+    <h5 class="mb-3">🚀 دسترسی سریع</h5>
+    <div class="row g-3">
+        @foreach (var card in Shortcuts)
+        {
+            <div class="col-md-3 col-sm-6">
+                <div class="card shortcut-card h-100 text-center"
+                     @onclick="() => Nav.NavigateTo(card.Url)">
+                    <div class="card-body">
+                        <div class="shortcut-icon">@card.Icon</div>
+                        <h5 class="card-title mt-2">@card.Title</h5>
+                        <p class="card-text text-muted small">@card.Description</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ===== نمودار Top 5 محصول (CSS) - کشویی ===== *@
+    <div class="inventory-section mt-5">
+
+        @* هدر کلیک‌پذیر *@
+        <div class="inventory-header d-flex justify-content-between align-items-center"
+             @onclick="() => showChart = !showChart">
+
+            <div class="d-flex align-items-center">
+                <span class="toggle-icon me-2">@(showChart ? "▼" : "◀")</span>
+                <h5 class="mb-0">📊 ۵ محصول با بیشترین موجودی</h5>
+                @if (topProducts.Any())
+                {
+                    <span class="badge bg-secondary ms-3">@topProducts.Count محصول</span>
+                }
+            </div>
+
+            <div>
+                @if (showChart)
+                {
+                    <button class="btn btn-sm btn-outline-secondary me-1"
+                            @onclick:stopPropagation="true"
+                            @onclick="LoadTopProductsAsync">
+                        🔄 بروزرسانی
+                    </button>
+                }
+                <span class="text-muted small ms-2">
+                    @(showChart ? "برای بستن کلیک کنید" : "برای نمایش کلیک کنید")
+                </span>
+            </div>
+        </div>
+
+        @* ===== محتوای قابل باز/بسته شدن ===== *@
+        @if (showChart)
+        {
+            <div class="inventory-content mt-3">
+                <div class="card">
+                    <div class="card-body">
+                        @if (topProductsLoading)
+                        {
+                            <div class="text-center p-4">
+                                <div class="spinner-border text-primary"></div>
+                                <div class="mt-2 text-muted">در حال بارگذاری...</div>
+                            </div>
+                        }
+                        else if (!topProducts.Any())
+                        {
+                            <div class="text-center p-4 text-muted">
+                                <div style="font-size: 2.5rem;">📭</div>
+                                <p class="mt-2 mb-0">هنوز محصولی با موجودی ثبت نشده است.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            var maxQty = topProducts.Max(p => p.Quantity);
+                            var index = 0;
+                            @foreach (var product in topProducts)
+                            {
+                                var percent = maxQty > 0 ? (int)((double)product.Quantity / maxQty * 100) : 0;
+                                var color = GetBarColor(index);
+                                <div class="chart-row">
+                                    <div class="chart-label">@product.Name</div>
+                                    <div class="chart-bar-wrapper">
+                                        <div class="chart-bar"
+                                             style="width: @percent%; background: @color;">
+                                            <span class="chart-value">@product.Quantity</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                index++;
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    @* ===== بخش Collapsible موجودی انبار ===== *@
+    <div class="inventory-section mt-5">
+
+        @* هدر کلیک‌پذیر *@
+        <div class="inventory-header d-flex justify-content-between align-items-center"
+             @onclick="() => showInventory = !showInventory">
+
+            <div class="d-flex align-items-center">
+                <span class="toggle-icon me-2">@(showInventory ? "▼" : "◀")</span>
+                <h5 class="mb-0">📊 موجودی کالا در انبارها</h5>
+                @if (inventory.Any())
+                {
+                    <span class="badge bg-secondary ms-3">@inventory.Count ردیف</span>
+                }
+            </div>
+
+            <div>
+                @if (showInventory)
+                {
+                    <button class="btn btn-sm btn-outline-secondary me-1"
+                            @onclick:stopPropagation="true"
+                            @onclick="LoadInventoryAsync">
+                        🔄 بروزرسانی
+                    </button>
+                    <button class="btn btn-sm btn-success me-1"
+                            @onclick:stopPropagation="true"
+                            @onclick="ExportExcel"
+                            disabled="@isExporting">
+                        @if (isExporting)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-file-earmark-excel"></i>
+                            <span class="ms-1">Excel</span>
+                        }
+                    </button>
+                }
+                <span class="text-muted small ms-2">
+                    @(showInventory ? "برای بستن کلیک کنید" : "برای نمایش کلیک کنید")
+                </span>
+            </div>
+        </div>
+
+        @* ===== محتوای قابل باز/بسته شدن ===== *@
+        @if (showInventory)
+        {
+            <div class="inventory-content mt-3">
+
+                @* ===== نوار فیلتر ===== *@
+                @if (inventory.Any())
+                {
+                    <div class="row mb-3 g-2">
+                        <div class="col-md-5">
+                            <input class="form-control" placeholder="🔍 جستجوی محصول..."
+                                   @bind="productSearch" @bind:event="oninput" />
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" @bind="warehouseFilter">
+                                <option value="">— همه انبارها —</option>
+                                @foreach (var w in inventory.Select(i => i.WarehouseName).Distinct().OrderBy(x => x))
+                                {
+                                    <option value="@w">@w</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-center">
+                            <small class="text-muted">
+                                نمایش @FilteredInventory.Count از @inventory.Count ردیف
+                            </small>
+                        </div>
+                    </div>
+                }
+
+                <div class="card">
+                    <div class="card-body p-0">
+                        @if (loading)
+                        {
+                            <div class="text-center p-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="mt-2 text-muted">در حال بارگذاری...</div>
+                            </div>
+                        }
+                        else if (!inventory.Any())
+                        {
+                            <div class="text-center p-5 text-muted">
+                                <div style="font-size: 3rem;">📭</div>
+                                <p class="mt-2 mb-0">هنوز هیچ حرکتی در انبارها ثبت نشده است.</p>
+                                <small>برای شروع، از منوی «حرکات انبار» یک ورود یا خروج ثبت کنید.</small>
+                            </div>
+                        }
+                        else
+                        {
+                            <table class="table table-striped table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>انبار</th>
+                                        <th>محصول</th>
+                                        <th class="text-end">موجودی</th>
+                                        <th class="text-center">وضعیت</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        int row = 1;
+                                    }
+                                    @foreach (var item in FilteredInventory)
+                                    {
+                                        <tr>
+                                            <td>@row</td>
+                                            <td>🏢 @item.WarehouseName</td>
+                                            <td>📦 @item.ProductName</td>
+                                            <td class="text-end fw-bold">@item.Quantity.ToString("N0")</td>
+                                            <td class="text-center">
+                                                @if (item.Quantity > 0)
+                                                {
+                                                    <span class="badge bg-success">موجود</span>
+                                                }
+                                                else if (item.Quantity == 0)
+                                                {
+                                                    <span class="badge bg-warning text-dark">تمام شده</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">منفی!</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                        row++;
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+
+                @* ===== کارت‌های جمع کل ===== *@
+                @if (inventory.Any())
+                {
+                    <div class="row mt-3 g-3">
+                        <div class="col-md-4">
+                            <div class="card border-primary h-100">
+                                <div class="card-body text-center">
+                                    <div style="font-size: 2rem;">📦</div>
+                                    <h6 class="text-muted mt-2">تعداد ردیف‌های موجودی</h6>
+                                    <p class="fw-bold fs-4 text-primary mb-0">@inventory.Count</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success h-100">
+                                <div class="card-body text-center">
+                                    <div style="font-size: 2rem;">🏢</div>
+                                    <h6 class="text-muted mt-2">تعداد انبارها</h6>
+                                    <p class="fw-bold fs-4 text-success mb-0">
+                                        @inventory.Select(i => i.WarehouseName).Distinct().Count()
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-info h-100">
+                                <div class="card-body text-center">
+                                    <div style="font-size: 2rem;">📊</div>
+                                    <h6 class="text-muted mt-2">مجموع موجودی</h6>
+                                    <p class="fw-bold fs-4 text-info mb-0">
+                                        @inventory.Sum(i => i.Quantity).ToString("N0")
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+@code {
+
+    // ===== مدل نمودار Top 5 =====
+    public class ProductChartItem
+    {
+        public string Name { get; set; } = "";
+        public int Quantity { get; set; }
+    }
+
+    private List<ProductChartItem> topProducts = new();
+    private bool topProductsLoading = true;
+
+    // ===== انتخاب رنگ برای هر ستون =====
+    private string GetBarColor(int index)
+    {
+        var colors = new[]
+        {
+            "linear-gradient(90deg, #6366f1, #8b5cf6)",  // بنفش-آبی
+            "linear-gradient(90deg, #ec4899, #f43f5e)",  // صورتی-قرمز
+            "linear-gradient(90deg, #f59e0b, #eab308)",  // نارنجی-زرد
+            "linear-gradient(90deg, #10b981, #14b8a6)",  // سبز-فیروزه‌ای
+            "linear-gradient(90deg, #06b6d4, #3b82f6)"   // فیروزه-آبی
+        };
+        return colors[index % colors.Length];
+    }
+
+    private class ShortcutCard
+    {
+        public string Icon { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Url { get; set; } = "";
+    }
+
+    private List<ShortcutCard> Shortcuts => new()
+    {
+        new() { Icon = "📦", Title = "محصولات",     Description = "مدیریت کالاها",  Url = "products"   },
+        new() { Icon = "🏢", Title = "انبارها",      Description = "مدیریت انبارها", Url = "warehouses" },
+        new() { Icon = "🔄", Title = "حرکات انبار", Description = "ورود و خروج",    Url = "movements"  },
+        new() { Icon = "📊", Title = "گزارش‌ها",     Description = "آمار و تحلیل",   Url = "reports"    },
+    };
+
+    // ===== مدل داخلی جدول موجودی =====
+    private class InventoryItem
+    {
+        public string ProductName { get; set; } = "";
+        public string WarehouseName { get; set; } = "";
+        public int Quantity { get; set; }
+    }
+
+    // 🆕 ===== مدل خروجی Excel =====
+    private class InventoryExportRow
+    {
+        public int Row { get; set; }
+        public string WarehouseName { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public int Quantity { get; set; }
+        public string Status { get; set; } = "";
+    }
+
+    // ===== حالت‌های صفحه =====
+    private List<InventoryItem> inventory = new();
+    private bool loading = true;
+    private bool showInventory = false;
+    private bool showChart = false;
+    private bool isExporting = false;
+
+    // ===== فیلترها =====
+    private string? productSearch;
+    private string? warehouseFilter;
+
+    // ===== لیست فیلترشده =====
+    private List<InventoryItem> FilteredInventory =>
+        inventory
+            .Where(i =>
+                (string.IsNullOrWhiteSpace(productSearch) ||
+                 i.ProductName.Contains(productSearch, StringComparison.OrdinalIgnoreCase))
+                &&
+                (string.IsNullOrWhiteSpace(warehouseFilter) ||
+                 i.WarehouseName == warehouseFilter)
+            )
+            .ToList();
+
+    // ===== چرخه‌ی حیات =====
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInventoryAsync();
+        await LoadTopProductsAsync();
+    }
+
+    // ===== بارگذاری موجودی از StockMovements =====
+    private async Task LoadInventoryAsync()
+    {
+        loading = true;
+        StateHasChanged();
+
+        inventory = await Db.StockMovements
+            .Include(m => m.Product)
+            .Include(m => m.Warehouse)
+            .GroupBy(m => new { m.ProductId, m.WarehouseId })
+            .Select(g => new InventoryItem
+                {
+                    ProductName = g.First().Product!.Name,
+                    WarehouseName = g.First().Warehouse!.Name,
+                    Quantity = g.Sum(m => m.Type == MovementType.In ? m.Quantity : -m.Quantity)
+                })
+            .Where(i => i.Quantity != 0)
+            .OrderBy(i => i.WarehouseName)
+            .ThenBy(i => i.ProductName)
+            .ToListAsync();
+
+        loading = false;
+    }
+
+    // 🆕 ===== بارگذاری Top 5 محصول برای نمودار =====
+    private async Task LoadTopProductsAsync()
+    {
+        topProductsLoading = true;
+        StateHasChanged();
+
+        topProducts = await Db.Products
+            .Where(p => p.Quantity > 0)
+            .OrderByDescending(p => p.Quantity)
+            .Take(5)
+            .Select(p => new ProductChartItem
+                {
+                    Name = p.Name ?? "(بی‌نام)",
+                    Quantity = p.Quantity
+                })
+            .ToListAsync();
+
+        topProductsLoading = false;
+    }
+
+    // 🆕 ===== خروجی Excel =====
+    private async Task ExportExcel()
+    {
+        try
+        {
+            isExporting = true;
+
+            int rowNum = 1;
+            var data = FilteredInventory
+                .Select(i => new InventoryExportRow
+                    {
+                        Row = rowNum++,
+                        WarehouseName = i.WarehouseName,
+                        ProductName = i.ProductName,
+                        Quantity = i.Quantity,
+                        Status = i.Quantity > 0 ? "موجود" : (i.Quantity == 0 ? "تمام شده" : "منفی")
+                    })
+                .ToList();
+
+            var columns = new Dictionary<string, Func<InventoryExportRow, object?>>
+                {
+                    ["#"] = r => r.Row,
+                    ["انبار"] = r => r.WarehouseName,
+                    ["محصول"] = r => r.ProductName,
+                    ["موجودی"] = r => r.Quantity,
+                    ["وضعیت"] = r => r.Status
+                };
+
+            var titleParts = new List<string> { "گزارش موجودی کالا در انبارها" };
+
+            if (!string.IsNullOrWhiteSpace(warehouseFilter))
+            {
+                titleParts.Add($"انبار: {warehouseFilter}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(productSearch))
+            {
+                titleParts.Add($"جستجو: «{productSearch}»");
+            }
+
+            titleParts.Add($"تاریخ: {GetPersianDateTimeString()}");
+
+            var title = string.Join("  |  ", titleParts);
+
+            var bytes = Excel.Export(data, "موجودی انبار", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+            var fileName = $"Inventory_{pc.GetYear(now):0000}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Excel Export Error: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    // 🆕 ===== متد تاریخ شمسی =====
+    private string GetPersianDateTimeString()
+    {
+        var pc = new PersianCalendar();
+        var now = DateTime.Now;
+        return $"{pc.GetYear(now):0000}/{pc.GetMonth(now):00}/{pc.GetDayOfMonth(now):00} - {now:HH:mm}";
+    }
+}
+
+<style>
+    .shortcut-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+        .shortcut-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+    .shortcut-icon {
+        font-size: 2.5rem;
+        line-height: 1;
+    }
+
+    /* ===== بخش Collapsible ===== */
+    .inventory-header {
+        cursor: pointer;
+        padding: 12px 16px;
+        background-color: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        transition: background-color 0.2s;
+        user-select: none;
+    }
+
+        .inventory-header:hover {
+            background-color: #e9ecef;
+        }
+
+    .toggle-icon {
+        display: inline-block;
+        font-size: 1rem;
+        color: #6c757d;
+        transition: transform 0.2s;
+    }
+
+    .inventory-content {
+        animation: slideDown 0.25s ease-out;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* ===== نمودار Top 5 (CSS) ===== */
+    .chart-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 14px;
+    }
+
+    .chart-label {
+        width: 130px;
+        text-align: right;
+        padding-left: 12px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-main);
+        flex-shrink: 0;
+    }
+
+    .chart-bar-wrapper {
+        flex: 1;
+        background: var(--bg-body);
+        border-radius: 8px;
+        overflow: hidden;
+        height: 36px;
+        border: 1px solid var(--border-color);
+    }
+
+    .chart-bar {
+        height: 100%;
+        border-radius: 8px;
+        transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-left: 12px;
+        min-width: 50px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .chart-value {
+        color: #ffffff;
+        font-weight: bold;
+        font-size: 0.9rem;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        padding-right: 8px;
+    }
+</style>

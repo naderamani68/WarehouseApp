@@ -1,0 +1,200 @@
+﻿/* ============================================
+   Theme Variables — تم روشن و تیره
+   ============================================ */
+
+:root {
+    /* ☀️ تم روشن (پیش‌فرض) */
+    --bg-body: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-header: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --text-main: #1a202c;
+    --text-muted: #718096;
+    --border-color: #e2e8f0;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --accent: #667eea;
+    --accent-hover: #5568d3;
+}
+
+/* 🌙 تم تیره — وقتی data-theme="dark" باشه فعال می‌شه */
+[data-theme="dark"] {
+    --bg-body: #0f172a;
+    --bg-card: #1e293b;
+    --bg-header: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    --text-main: #e2e8f0;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --accent: #818cf8;
+    --accent-hover: #6366f1;
+}
+
+/* ============================================
+   Transition نرم برای تغییر تم
+   ============================================ */
+
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ============================================
+   استایل‌های عمومی
+   ============================================ */
+
+body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    margin: 0;
+}
+
+.card, .panel {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+}
+
+/* ============================================
+   دکمه سوییچ تم
+   ============================================ */
+
+.theme-toggle {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+    .theme-toggle:hover {
+        transform: rotate(20deg) scale(1.1);
+        background: rgba(255, 255, 255, 0.25);
+    }
+
+/* ============================================
+   Progress Bar موجودی محصولات
+   ============================================ */
+
+.stock-bar {
+    width: 100%;
+    min-width: 80px;
+    height: 10px;
+    background-color: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.stock-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.6s ease-in-out;
+    min-width: 2px;
+}
+
+    /* 🟢 موجودی خوب (۶۷٪ تا ۱۰۰٪) */
+    .stock-bar-fill.stock-bar-green {
+        background: linear-gradient(90deg, #20c997, #28a745);
+    }
+
+    /* 🟡 موجودی متوسط (۳۴٪ تا ۶۶٪) */
+    .stock-bar-fill.stock-bar-yellow {
+        background: linear-gradient(90deg, #ffc107, #ffb300);
+    }
+
+    /* 🔴 موجودی کم (۰٪ تا ۳۳٪) */
+    .stock-bar-fill.stock-bar-red {
+        background: linear-gradient(90deg, #dc3545, #c82333);
+    }
+
+/* نمایش تمیزتر درصد زیر نوار */
+.stock-bar + small {
+    display: inline-block;
+    margin-top: 3px;
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   باکس راهنمای وضعیت موجودی
+   ============================================ */
+
+.stock-help {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: var(--shadow);
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+    .stock-help summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--text-main);
+        list-style: none; /* حذف فلش پیش‌فرض */
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        user-select: none;
+        padding: 2px 0;
+    }
+
+        .stock-help summary::-webkit-details-marker {
+            display: none; /* حذف فلش در کروم/سافاری */
+        }
+
+        .stock-help summary::before {
+            content: "▶";
+            font-size: 0.7rem;
+            transition: transform 0.3s;
+            color: var(--accent);
+            display: inline-block;
+        }
+
+    .stock-help[open] summary::before {
+        transform: rotate(90deg); /* فلش چرخش کنه وقتی بازه */
+    }
+
+    .stock-help summary:hover {
+        color: var(--accent);
+    }
+
+.stock-help-content {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+    color: var(--text-main);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+    .stock-help-content ul {
+        padding-right: 20px; /* RTL: padding راست */
+        margin-bottom: 8px;
+    }
+
+    .stock-help-content li {
+        margin-bottom: 4px;
+    }
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
