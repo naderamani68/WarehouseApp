@@ -130,7 +130,7 @@ namespace WarehouseApp.Migrations
                     b.Property<string>("Position")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Role")
+                    b.Property<int?>("RoleId")
                         .HasColumnType("int");
 
                     b.Property<string>("Username")
@@ -141,6 +141,8 @@ namespace WarehouseApp.Migrations
 
                     b.HasIndex("EmployeeCode")
                         .IsUnique();
+
+                    b.HasIndex("RoleId");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -173,6 +175,76 @@ namespace WarehouseApp.Migrations
                     b.HasIndex("CategoryId");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("WarehouseApp.Data.Role", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystemRole")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("Permissions")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Roles");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Description = "دسترسی کامل به همهٔ بخش‌ها — شامل اختیاراتی که در آینده اضافه می‌شوند",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "مدیر سیستم",
+                            Permissions = -1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Description = "همهٔ عملیات انبار و گزارش‌ها، بدون مدیریت کارمندان",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "مدیر انبار",
+                            Permissions = 5119
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Description = "ثبت حرکات، مدیریت محصولات و دیدن گزارش‌ها",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "انباردار",
+                            Permissions = 899
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Description = "فقط مشاهده",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "بازدیدکننده",
+                            Permissions = 513
+                        });
                 });
 
             modelBuilder.Entity("WarehouseApp.Data.StockMovement", b =>
@@ -236,6 +308,16 @@ namespace WarehouseApp.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.Employee", b =>
+                {
+                    b.HasOne("WarehouseApp.Data.Role", "Role")
+                        .WithMany("Employees")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.Product", b =>
                 {
                     b.HasOne("WarehouseApp.Data.Category", "Category")
@@ -268,6 +350,11 @@ namespace WarehouseApp.Migrations
             modelBuilder.Entity("WarehouseApp.Data.Category", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("WarehouseApp.Data.Role", b =>
+                {
+                    b.Navigation("Employees");
                 });
 #pragma warning restore 612, 618
         }

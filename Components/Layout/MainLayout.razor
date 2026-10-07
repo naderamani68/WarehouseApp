@@ -1,6 +1,7 @@
 ﻿@inherits LayoutComponentBase
 @using System.Globalization
 @implements IDisposable
+@inject IHttpContextAccessor HttpAccessor
 
 <div class="page">
     <div class="sidebar">
@@ -21,6 +22,19 @@
 
             @* ===== سمت چپ: تم + تاریخ و ساعت زنده ===== *@
             <div class="d-flex align-items-center gap-3">
+
+                @* ===== کاربر جاری ===== *@
+                @if (IsLoggedIn)
+                {
+                    <div class="user-box">
+                        <span class="user-name">@CurrentUserName</span>
+                        <span class="user-role">@CurrentRoleTitle</span>
+                    </div>
+
+                    <a class="logout-btn" href="/account/logout" title="خروج از حساب">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                }
 
                 @* دکمه سوییچ تم (کامپوننت مستقل با rendermode خودش) *@
                 <ThemeToggle />
@@ -46,6 +60,30 @@
 </div>
 
 @code {
+    // ===== کاربر جاری (خوانده‌شده از کوکی در هر درخواست) =====
+    private System.Security.Claims.ClaimsPrincipal? CurrentUser => HttpAccessor.HttpContext?.User;
+
+    private bool IsLoggedIn => CurrentUser?.Identity?.IsAuthenticated == true;
+
+    private string CurrentUserName
+    {
+        get
+        {
+            if (!IsLoggedIn) return string.Empty;
+            return CurrentUser!.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value
+                   ?? CurrentUser.Identity?.Name
+                   ?? "کاربر";
+        }
+    }
+
+    private string CurrentRoleTitle
+    {
+        get
+        {
+            return CurrentUser?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+        }
+    }
+
     private System.Threading.Timer? _timer;
 
     protected override void OnInitialized()

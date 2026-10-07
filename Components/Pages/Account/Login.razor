@@ -35,7 +35,7 @@
 
     <div class="mb-3">
         <label class="form-label">رمز عبور</label>
-        <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" />
+        <InputText type="password" @bind-Value="Input.Password" class="form-control" dir="ltr" data-latin-password="true" autocomplete="current-password" />
         <ValidationMessage For="() => Input.Password" class="text-danger small" />
     </div>
 
@@ -69,6 +69,21 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // اگر نشست کاربر به‌دلیل غیرفعال‌شدن بسته شده، دلیلش را نشان بده
+        var notice = HttpContext?.Request.Cookies["AuthNotice"];
+        if (!string.IsNullOrEmpty(notice))
+        {
+            errorMessage = notice switch
+            {
+                "employee-inactive" => "حساب کاربری شما غیرفعال شده است. با مدیر سیستم تماس بگیرید",
+                "role-inactive" => "نقش (سمت) شما غیرفعال شده است. با مدیر سیستم تماس بگیرید",
+                _ => "نشست شما پایان یافت. لطفاً دوباره وارد شوید"
+            };
+
+            // پیام را پاک کن تا در بازدید بعدی تکرار نشود
+            HttpContext?.Response.Cookies.Delete("AuthNotice");
+        }
+
         // اگر هنوز هیچ کارمندی ساخته نشده، برو به راه‌اندازی اولیه
         if (!await Auth.AnyEmployeesAsync())
         {
@@ -104,7 +119,7 @@
             new(ClaimTypes.NameIdentifier, result.Employee.Id.ToString()),
             new(ClaimTypes.Name, result.Employee.Username),
             new(ClaimTypes.GivenName, result.Employee.FullName),
-            new(ClaimTypes.Role, result.Employee.Role.ToString())
+            new(ClaimTypes.Role, result.Employee.Role?.Name ?? string.Empty)
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

@@ -44,13 +44,13 @@
 
     <div class="mb-3">
         <label class="form-label">رمز عبور</label>
-        <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" />
+        <InputText type="password" @bind-Value="Input.Password" class="form-control" dir="ltr" data-latin-password="true" autocomplete="new-password" />
         <ValidationMessage For="() => Input.Password" class="text-danger small" />
     </div>
 
     <div class="mb-3">
         <label class="form-label">تکرار رمز عبور</label>
-        <InputText type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" />
+        <InputText type="password" @bind-Value="Input.ConfirmPassword" class="form-control" dir="ltr" data-latin-password="true" autocomplete="new-password" />
         <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger small" />
     </div>
 
@@ -114,7 +114,7 @@
             new(ClaimTypes.NameIdentifier, result.Employee.Id.ToString()),
             new(ClaimTypes.Name, result.Employee.Username),
             new(ClaimTypes.GivenName, result.Employee.FullName),
-            new(ClaimTypes.Role, result.Employee.Role.ToString())
+            new(ClaimTypes.Role, result.Employee.Role?.Name ?? string.Empty)
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

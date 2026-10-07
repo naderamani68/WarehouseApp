@@ -3,6 +3,7 @@ using WarehouseApp.Components;
 using WarehouseApp.Data;
 using WarehouseApp.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +18,15 @@ builder.Logging.AddDebug();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// کارخانهٔ ساخت زمینهٔ پایگاه داده.
+// چون چیدمان (منو) و صفحه هم‌زمان رندر می‌شوند، هر عملیات باید زمینهٔ مستقل خودش را
+// داشته باشد؛ در غیر این صورت خطای «دو عملیات هم‌زمان روی یک اتصال» رخ می‌دهد.
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// زمینهٔ درون‌درخواستی برای صفحه‌ها (هر درخواست یک نمونه)
+builder.Services.AddScoped<ApplicationDbContext>(sp =>
+    sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<ThemeService>();
@@ -35,6 +43,60 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+
+        // ===== اعتبارسنجی مجدد کوکی در هر درخواست =====
+        // اگر کارمند یا نقش (سمت) او غیرفعال شود، در همان درخواست بعدی از سیستم خارج می‌شود.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnValidatePrincipal = async context =>
+            {
+                var employeeId = AccessService.GetEmployeeId(context.Principal);
+
+                if (employeeId is null)
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    return;
+                }
+
+                var factory = context.HttpContext.RequestServices
+                    .GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+
+                await using var db = await factory.CreateDbContextAsync();
+
+                var employee = await db.Employees
+                    .Include(e => e.Role)
+                    .FirstOrDefaultAsync(e => e.Id == employeeId);
+
+                // دلیل خارج‌شدن را در یک کوکی کوتاه‌عمر می‌گذاریم تا صفحهٔ ورود نشان دهد
+                string? notice = null;
+
+                if (employee is null)
+                {
+                    notice = "not-found";
+                }
+                else if (!employee.IsActive)
+                {
+                    notice = "employee-inactive";
+                }
+                else if (employee.Role is null || !employee.Role.IsActive)
+                {
+                    notice = "role-inactive";
+                }
+
+                if (notice is not null)
+                {
+                    context.Response.Cookies.Append("AuthNotice", notice, new CookieOptions
+                    {
+                        HttpOnly = true,
+                        MaxAge = TimeSpan.FromMinutes(2)
+                    });
+
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -42,6 +104,8 @@ builder.Services.AddCascadingAuthenticationState();
 
 // ===== سرویس احراز هویت =====
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AccessService>();
+builder.Services.AddHttpContextAccessor();   // برای خواندن کاربر جاری در چیدمان
 builder.Services.AddScoped<ToastService>();
 
 var app = builder.Build();

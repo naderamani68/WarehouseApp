@@ -41,15 +41,10 @@ public class AuthService
             return new AuthResult { Success = false, Error = "نام کاربری و رمز عبور را وارد کنید" };
         }
 
-        var user = await _db.Employees.FirstOrDefaultAsync(e => e.Username == username);
+        var user = await _db.Employees.Include(e => e.Role).FirstOrDefaultAsync(e => e.Username == username);
         if (user is null)
         {
             return new AuthResult { Success = false, Error = "نام کاربری یا رمز عبور نادرست است" };
-        }
-
-        if (!user.IsActive)
-        {
-            return new AuthResult { Success = false, Error = "حساب کاربری شما غیرفعال است. با مدیر سیستم تماس بگیرید" };
         }
 
         if (user.LockoutUntil.HasValue && user.LockoutUntil.Value > DateTime.Now)
@@ -74,6 +69,17 @@ public class AuthService
 
             await _db.SaveChangesAsync();
             return new AuthResult { Success = false, Error = "نام کاربری یا رمز عبور نادرست است" };
+        }
+
+        // ===== بررسی وضعیت حساب — بعد از تأیید رمز، تا اطلاعات حساب لو نرود =====
+        if (!user.IsActive)
+        {
+            return new AuthResult { Success = false, Error = "حساب کاربری شما غیرفعال است. با مدیر سیستم تماس بگیرید" };
+        }
+
+        if (user.Role is not null && !user.Role.IsActive)
+        {
+            return new AuthResult { Success = false, Error = "نقش (سمت) شما غیرفعال شده است. با مدیر سیستم تماس بگیرید" };
         }
 
         // اگر الگوریتم هش قدیمی شده باشد، رمز را با الگوریتم تازه دوباره هش می‌کنیم
@@ -104,9 +110,14 @@ public class AuthService
             FullName = fullName.Trim(),
             Username = username.Trim(),
             Position = "مدیر سیستم",
-            Role = UserRole.Admin,
+            RoleId = Role.AdminRoleId,
             IsActive = true
         };
+        if (!IsLatinPassword(password))
+        {
+            return new AuthResult { Success = false, Error = "رمز عبور باید فقط شامل حروف، عدد و نشانه‌های انگلیسی باشد" };
+        }
+
         admin.PasswordHash = _hasher.HashPassword(admin, password);
 
         _db.Employees.Add(admin);
@@ -128,12 +139,50 @@ public class AuthService
             return new AuthResult { Success = false, Error = "این کد پرسنلی قبلاً ثبت شده است" };
         }
 
+        if (!IsLatinPassword(password))
+        {
+            return new AuthResult { Success = false, Error = "رمز عبور باید فقط شامل حروف، عدد و نشانه‌های انگلیسی باشد" };
+        }
+
         employee.PasswordHash = _hasher.HashPassword(employee, password);
         _db.Employees.Add(employee);
         await _db.SaveChangesAsync();
 
         return new AuthResult { Success = true, Employee = employee };
     }
+
+    /// <summary>به‌روزرسانی اطلاعات کارمند و (در صورت نیاز) بازنشانی رمز عبور</summary>
+    public async Task<AuthResult> UpdateEmployeeAsync(Employee employee, string? newPassword)
+    {
+        if (await _db.Employees.AnyAsync(e => e.Username == employee.Username && e.Id != employee.Id))
+        {
+            return new AuthResult { Success = false, Error = "این نام کاربری برای کارمند دیگری ثبت شده است" };
+        }
+
+        if (await _db.Employees.AnyAsync(e => e.EmployeeCode == employee.EmployeeCode && e.Id != employee.Id))
+        {
+            return new AuthResult { Success = false, Error = "این کد پرسنلی برای کارمند دیگری ثبت شده است" };
+        }
+
+        if (!string.IsNullOrWhiteSpace(newPassword))
+        {
+            if (!IsLatinPassword(newPassword))
+            {
+                return new AuthResult { Success = false, Error = "رمز عبور باید فقط شامل حروف، عدد و نشانه‌های انگلیسی باشد" };
+            }
+
+            employee.PasswordHash = _hasher.HashPassword(employee, newPassword);
+        }
+
+        _db.Employees.Update(employee);
+        await _db.SaveChangesAsync();
+
+        return new AuthResult { Success = true, Employee = employee };
+    }
+
+    /// <summary>آیا رمز فقط شامل کاراکترهای قابل‌چاپ انگلیسی است؟ (بدون فاصله)</summary>
+    private static bool IsLatinPassword(string password)
+        => !string.IsNullOrEmpty(password) && password.All(c => c >= 33 && c <= 126);
 
     /// <summary>هش‌کردن رمز عبور</summary>
     public string HashPassword(Employee employee, string password) => _hasher.HashPassword(employee, password);

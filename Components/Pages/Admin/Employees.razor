@@ -1,0 +1,400 @@
+﻿@page "/employees"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject AuthService Auth
+@inject ToastService Toasts
+
+<PageTitle>کارمندان | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">👥 مدیریت کارمندان</h3>
+
+@* ===== میزبان پیام‌های شناور ===== *@
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    @* ===== فرم افزودن / ویرایش ===== *@
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "افزودن کارمند جدید" : $"ویرایش کارمند: {editing.FullName}")</h5>
+
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">کد پرسنلی</label>
+                <input class="form-control" dir="ltr" @bind="formEmployeeCode" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">نام و نام خانوادگی</label>
+                <input class="form-control" @bind="formFullName" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">نقش (سمت سازمانی)</label>
+                <select class="form-select" @bind="formRoleId">
+                    <option value="0">— انتخاب کنید —</option>
+                    @foreach (var r in roles)
+                    {
+                        <option value="@r.Id">@r.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">کد ملی</label>
+                <input class="form-control" dir="ltr" @bind="formNationalId" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تلفن</label>
+                <input class="form-control" dir="ltr" @bind="formPhone" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">سمت (توضیح آزاد)</label>
+                <input class="form-control" @bind="formPosition" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تاریخ استخدام</label>
+                <input type="date" class="form-control" @bind="formHireDate" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">آدرس</label>
+                <input class="form-control" @bind="formAddress" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">نام کاربری</label>
+                <input class="form-control" dir="ltr" data-latin-only="true" @bind="formUsername" />
+                <div class="form-text">فقط حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">
+                    @(editing is null ? "رمز عبور" : "رمز عبور جدید (اختیاری)")
+                </label>
+                <input type="password" class="form-control" dir="ltr" data-latin-password="true" @bind="formPassword" autocomplete="new-password" />
+                <div class="form-text">حداقل ۶ کاراکتر — فقط حروف، عدد و نشانه‌های انگلیسی</div>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="empActive" @bind="formIsActive" />
+                    <label class="form-check-label" for="empActive">
+                        حساب فعال باشد
+                        <span class="text-muted small">(اگر غیرفعال شود، این کارمند نمی‌تواند وارد شود)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            @if (editing is null)
+            {
+                <button type="button" class="btn btn-primary" @onclick="SaveAsync">افزودن کارمند</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-success" @onclick="SaveAsync">ذخیره تغییرات</button>
+                <button type="button" class="btn btn-secondary" @onclick="ResetForm">انصراف</button>
+            }
+        </div>
+    </div>
+
+    @* ===== فهرست کارمندان ===== *@
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>کد پرسنلی</th>
+                <th>نام و نام خانوادگی</th>
+                <th>نقش</th>
+                <th>سمت</th>
+                <th>تلفن</th>
+                <th>وضعیت</th>
+                <th>آخرین ورود</th>
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (employees.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted">هیچ کارمندی ثبت نشده است</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var e in employees)
+                {
+                    <tr>
+                        <td dir="ltr">@e.EmployeeCode</td>
+                        <td>@e.FullName</td>
+                        <td>
+                            @if (e.Role is null)
+                            {
+                                <span class="text-muted small">— بدون نقش —</span>
+                            }
+                            else if (e.Role.IsActive)
+                            {
+                                <span class="badge bg-info text-dark">@e.Role.Name</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">@e.Role.Name (غیرفعال)</span>
+                            }
+                        </td>
+                        <td class="text-muted small">@e.Position</td>
+                        <td dir="ltr">@e.Phone</td>
+                        <td>
+                            @if (e.IsActive)
+                            {
+                                <span class="badge bg-success">فعال</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">غیرفعال</span>
+                            }
+                        </td>
+                        <td class="text-muted small">
+                            @(e.LastLoginAt.HasValue ? e.LastLoginAt.Value.ToString("yyyy/MM/dd HH:mm") : "— هرگز —")
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-warning" @onclick="() => StartEdit(e)">ویرایش</button>
+                            <button type="button" class="btn btn-sm @(e.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                                    @onclick="() => ToggleActiveAsync(e)">
+                                @(e.IsActive ? "غیرفعال کن" : "فعال کن")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private List<Employee> employees = new();
+    private List<Role> roles = new();
+
+    private Employee? editing;
+
+    private string formEmployeeCode = string.Empty;
+    private string formFullName = string.Empty;
+    private string formNationalId = string.Empty;
+    private string formPhone = string.Empty;
+    private string formAddress = string.Empty;
+    private string formPosition = string.Empty;
+    private string formUsername = string.Empty;
+    private string formPassword = string.Empty;
+    private DateTime? formHireDate;
+    private int formRoleId;
+    private bool formIsActive = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        allowed = await Access.HasAsync(user, Permissions.ManageEmployees);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        employees = await Db.Employees
+            .Include(e => e.Role)
+            .OrderBy(e => e.EmployeeCode)
+            .ToListAsync();
+
+        roles = await Db.Roles
+            .Where(r => r.IsActive)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+    }
+
+    private void ResetForm()
+    {
+        editing = null;
+        formEmployeeCode = string.Empty;
+        formFullName = string.Empty;
+        formNationalId = string.Empty;
+        formPhone = string.Empty;
+        formAddress = string.Empty;
+        formPosition = string.Empty;
+        formUsername = string.Empty;
+        formPassword = string.Empty;
+        formHireDate = null;
+        formRoleId = 0;
+        formIsActive = true;
+    }
+
+    private void StartEdit(Employee e)
+    {
+        editing = e;
+        formEmployeeCode = e.EmployeeCode;
+        formFullName = e.FullName;
+        formNationalId = e.NationalId ?? string.Empty;
+        formPhone = e.Phone ?? string.Empty;
+        formAddress = e.Address ?? string.Empty;
+        formPosition = e.Position ?? string.Empty;
+        formUsername = e.Username;
+        formPassword = string.Empty;
+        formHireDate = e.HireDate;
+        formRoleId = e.RoleId ?? 0;
+        formIsActive = e.IsActive;
+    }
+
+    private async Task SaveAsync()
+    {
+        // ===== بررسی‌های ورودی =====
+        if (string.IsNullOrWhiteSpace(formEmployeeCode))
+        {
+            Toasts.ShowError("کد پرسنلی را وارد کنید");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formFullName))
+        {
+            Toasts.ShowError("نام و نام خانوادگی را وارد کنید");
+            return;
+        }
+
+        if (formRoleId == 0)
+        {
+            Toasts.ShowError("نقش کارمند را انتخاب کنید");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formUsername) || !System.Text.RegularExpressions.Regex.IsMatch(formUsername.Trim(), "^[A-Za-z0-9._-]+$"))
+        {
+            Toasts.ShowError("نام کاربری باید با حروف انگلیسی باشد (حروف، عدد، نقطه، خط تیره و زیرخط)");
+            return;
+        }
+
+        if (editing is null && formPassword.Length < 6)
+        {
+            Toasts.ShowError("رمز عبور باید حداقل ۶ کاراکتر باشد");
+            return;
+        }
+
+        if (editing is not null && formPassword.Length > 0 && formPassword.Length < 6)
+        {
+            Toasts.ShowError("رمز عبور جدید باید حداقل ۶ کاراکتر باشد");
+            return;
+        }
+
+        try
+        {
+            if (editing is null)
+            {
+                var employee = new Employee
+                {
+                    EmployeeCode = formEmployeeCode.Trim(),
+                    FullName = formFullName.Trim(),
+                    NationalId = NullIfEmpty(formNationalId),
+                    Phone = NullIfEmpty(formPhone),
+                    Address = NullIfEmpty(formAddress),
+                    Position = NullIfEmpty(formPosition),
+                    HireDate = formHireDate,
+                    Username = formUsername.Trim(),
+                    RoleId = formRoleId,
+                    IsActive = formIsActive
+                };
+
+                var result = await Auth.CreateEmployeeAsync(employee, formPassword);
+                if (!result.Success)
+                {
+                    Toasts.ShowError(result.Error ?? "ساخت کارمند ناموفق بود");
+                    return;
+                }
+
+                await AuditAsync("افزودن", employee.Id, $"کارمند «{employee.FullName}» ساخته شد");
+                Toasts.ShowSuccess($"کارمند «{employee.FullName}» ساخته شد");
+            }
+            else
+            {
+                editing.EmployeeCode = formEmployeeCode.Trim();
+                editing.FullName = formFullName.Trim();
+                editing.NationalId = NullIfEmpty(formNationalId);
+                editing.Phone = NullIfEmpty(formPhone);
+                editing.Address = NullIfEmpty(formAddress);
+                editing.Position = NullIfEmpty(formPosition);
+                editing.HireDate = formHireDate;
+                editing.Username = formUsername.Trim();
+                editing.RoleId = formRoleId;
+                editing.IsActive = formIsActive;
+
+                var result = await Auth.UpdateEmployeeAsync(editing, string.IsNullOrWhiteSpace(formPassword) ? null : formPassword);
+                if (!result.Success)
+                {
+                    Toasts.ShowError(result.Error ?? "ذخیره تغییرات ناموفق بود");
+                    return;
+                }
+
+                var details = string.IsNullOrWhiteSpace(formPassword)
+                    ? $"کارمند «{editing.FullName}» ویرایش شد"
+                    : $"کارمند «{editing.FullName}» ویرایش و رمز او بازنشانی شد";
+                await AuditAsync("ویرایش", editing.Id, details);
+                Toasts.ShowSuccess(details);
+            }
+
+            ResetForm();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleActiveAsync(Employee e)
+    {
+        try
+        {
+            e.IsActive = !e.IsActive;
+            Db.Employees.Update(e);
+            await Db.SaveChangesAsync();
+
+            var details = e.IsActive
+                ? $"کارمند «{e.FullName}» فعال شد"
+                : $"کارمند «{e.FullName}» غیرفعال شد";
+            await AuditAsync("ویرایش", e.Id, details);
+            Toasts.ShowSuccess(details);
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+    }
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, int entityId, string details)
+    {
+        var username = AuthState is null ? null : (await AuthState).User.Identity?.Name;
+
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = "کارمند",
+            EntityId = entityId,
+            Details = details,
+            Username = username
+        });
+
+        await Db.SaveChangesAsync();
+    }
+}

@@ -1,18 +1,30 @@
 ﻿// ====================================================
-//  فیلتر ورودی نام کاربری — فقط حروف و اعداد انگلیسی
-//  هر عنصری که ویژگی data-latin-only داشته باشد،
-//  کاراکتر غیرمجاز در آن تایپ نمی‌شود (پاک می‌شود).
+//  فیلتر ورودی: جلوگیری از تایپ حروف غیرانگلیسی
+//
+//  data-latin-only     → نام کاربری: حروف، عدد، نقطه، خط تیره، زیرخط، @
+//  data-latin-password → رمز عبور: همهٔ کاراکترهای قابل‌چاپ انگلیسی (بدون فاصله)
 // ====================================================
 (function () {
-    var allowed = /[^A-Za-z0-9._\-@]/g;
+    var allowedUser = /[^A-Za-z0-9._\-@]/g;
+    var allowedPassword = /[^\x21-\x7E]/g;
 
     document.addEventListener("input", function (e) {
         var el = e.target;
-        if (el && el.hasAttribute && el.hasAttribute("data-latin-only")) {
-            var cleaned = el.value.replace(allowed, "");
-            if (cleaned !== el.value) {
-                el.value = cleaned;
-            }
+        if (!el || !el.hasAttribute) { return; }
+
+        var pattern = null;
+
+        if (el.hasAttribute("data-latin-only")) {
+            pattern = allowedUser;
+        } else if (el.hasAttribute("data-latin-password")) {
+            pattern = allowedPassword;
+        }
+
+        if (pattern === null) { return; }
+
+        var cleaned = el.value.replace(pattern, "");
+        if (cleaned !== el.value) {
+            el.value = cleaned;
         }
     }, true);
 })();

@@ -1,4 +1,9 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject IHttpContextAccessor HttpAccessor
+@inject AccessService Access
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">📦 انبار من</a>
     </div>
@@ -51,13 +56,31 @@
             </NavLink>
         </div>
 
-                <div class="nav-item px-3">
-            <NavLink class="nav-link" href="Test">
-                <span class="bi bi-bar-chart-fill me-2" aria-hidden="true"></span>
-               تست 
-            </NavLink>
-        </div>
-
+        @* ===== آیتم‌های مدیریتی (بر اساس اختیار کاربر) ===== *@
+        @if (canManageEmployees)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="employees">
+                    <span class="bi bi-people-fill me-2" aria-hidden="true"></span>
+                    کارمندان
+                </NavLink>
+            </div>
+        }
+         @if (canManageRoles)         {             <div class="nav-item px-3">                 <NavLink class="nav-link" href="roles">                     <span class="bi bi-shield-lock-fill me-2" aria-hidden="true"></span>                     نقش‌ها و دسترسی‌ها                 </NavLink>             </div>         }
 
     </nav>
 </div>
+
+@code {
+    private bool canManageRoles;
+    private bool canManageEmployees;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // اختیارات را یک‌بار می‌خوانیم و برای همهٔ آیتم‌های منو استفاده می‌کنیم
+        var permissions = await Access.GetPermissionsAsync(HttpAccessor.HttpContext?.User);
+
+        canManageEmployees = (permissions & Permissions.ManageEmployees) == Permissions.ManageEmployees;
+        canManageRoles = (permissions & Permissions.ManageRoles) == Permissions.ManageRoles;
+    }
+}
