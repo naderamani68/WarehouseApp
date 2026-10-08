@@ -1,5 +1,6 @@
 ﻿@page "/warehouses"
 @attribute [Authorize]
+@inherits PageBase
 @rendermode InteractiveServer
 @using WarehouseApp.Services
 @using System.Globalization
@@ -15,7 +16,7 @@
 @* ===== دکمه‌ی خروجی Excel ===== *@
 <div class="row mb-3">
     <div class="col-12 text-end">
-        <button class="btn btn-success" @onclick="ExportExcel" disabled="@isExporting">
+        <button class="btn btn-success" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
             @if (isExporting)
             {
                 <span class="spinner-border spinner-border-sm me-1"></span>
@@ -68,12 +69,18 @@
                         }
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(w)">
-                            ویرایش
-                        </button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteWarehouse(w)">
-                            حذف
-                        </button>
+                        @if (Can(Permissions.ManageWarehouses))
+                        {
+                            <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(w)">
+                                ویرایش
+                            </button>
+                        }
+                        @if (Can(Permissions.DeleteWarehouses))
+                        {
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteWarehouse(w)">
+                                حذف
+                            </button>
+                        }
                     </td>
                 </tr>
             }
@@ -105,11 +112,11 @@
     </label>
 </div>
 
-@if (editingWarehouse == null)
+@if (editingWarehouse == null && Can(Permissions.ManageWarehouses))
 {
     <button class="btn btn-primary" @onclick="AddWarehouse">افزودن</button>
 }
-else
+else if (Can(Permissions.ManageWarehouses))
 {
     <button class="btn btn-success" @onclick="SaveEdit">ذخیره تغییرات</button>
     <button class="btn btn-secondary" @onclick="CancelEdit">انصراف</button>
@@ -126,7 +133,7 @@ else
     private string? newDescription;
     private bool newIsActive = true;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnPageInitializedAsync()
     {
         await LoadWarehouses();
     }
@@ -138,6 +145,12 @@ else
 
     private async Task AddWarehouse()
     {
+        if (!Can(Permissions.ManageWarehouses))
+        {
+            Toasts.ShowError("شما اجازهٔ افزودن انبار را ندارید");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(newName))
         {
             Toasts.ShowError("نام انبار نمی‌تواند خالی باشد");
@@ -178,6 +191,12 @@ else
 
     private async Task SaveEdit()
     {
+        if (!Can(Permissions.ManageWarehouses))
+        {
+            Toasts.ShowError("شما اجازهٔ ویرایش انبار را ندارید");
+            return;
+        }
+
         if (editingWarehouse == null) return;
 
         if (string.IsNullOrWhiteSpace(newName))
@@ -214,6 +233,12 @@ else
 
     private async Task DeleteWarehouse(Warehouse w)
     {
+        if (!Can(Permissions.DeleteWarehouses))
+        {
+            Toasts.ShowError("شما اجازهٔ حذف انبار را ندارید");
+            return;
+        }
+
         try
         {
             Db.Warehouses.Remove(w);
@@ -239,6 +264,12 @@ else
 
     private async Task ExportExcel()
     {
+        if (!Can(Permissions.ExportExcel))
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
         try
         {
             isExporting = true;

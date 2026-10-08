@@ -1,5 +1,6 @@
 ﻿@page "/reports"
 @attribute [Authorize]
+@inherits PageBase
 @rendermode InteractiveServer
 
 @using WarehouseApp.Data
@@ -184,8 +185,14 @@
     private List<StockMovement> recentMovements = new();
     private List<TopProductItem> topProducts = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnPageInitializedAsync()
     {
+        if (!Can(Permissions.ViewReports))
+        {
+            Nav.NavigateTo("/access-denied", forceLoad: true);
+            return;
+        }
+
         // آمار کلی
         totalProducts = await Db.Products.CountAsync();
         totalWarehouses = await Db.Warehouses.CountAsync();

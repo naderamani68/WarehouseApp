@@ -1,11 +1,12 @@
 ﻿@page "/"
 @attribute [Authorize]
+@inherits PageBase
 @rendermode InteractiveServer
-@inject NavigationManager Nav
 @inject ApplicationDbContext Db
 @using WarehouseApp.Services
 @using System.Globalization
 @inject ExcelService Excel
+@inject ToastService Toasts
 @inject IJSRuntime JS
 
 
@@ -142,7 +143,7 @@
                     <button class="btn btn-sm btn-success me-1"
                             @onclick:stopPropagation="true"
                             @onclick="ExportExcel"
-                            disabled="@isExporting">
+                            disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
                         @if (isExporting)
                         {
                             <span class="spinner-border spinner-border-sm"></span>
@@ -382,7 +383,7 @@
             .ToList();
 
     // ===== چرخه‌ی حیات =====
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnPageInitializedAsync()
     {
         await LoadInventoryAsync();
         await LoadTopProductsAsync();
@@ -435,6 +436,12 @@
     // 🆕 ===== خروجی Excel =====
     private async Task ExportExcel()
     {
+        if (!Can(Permissions.ExportExcel))
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
         try
         {
             isExporting = true;

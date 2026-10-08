@@ -1,5 +1,6 @@
 ﻿@page "/categories"
 @attribute [Authorize]
+@inherits PageBase
 @rendermode InteractiveServer
 @inject ApplicationDbContext Db
 @inject IJSRuntime JS
@@ -32,11 +33,11 @@
                               placeholder="توضیحات اختیاری..."></textarea>
                 </div>
 
-                @if (editingCategory == null)
+                @if (editingCategory == null && Can(Permissions.ManageCategories))
                 {
                     <button class="btn btn-primary" @onclick="AddCategory">➕ افزودن</button>
                 }
-                else
+                else if (Can(Permissions.ManageCategories))
                 {
                     <button class="btn btn-success" @onclick="SaveEdit">💾 ذخیره تغییرات</button>
                     <button class="btn btn-secondary" @onclick="CancelEdit">انصراف</button>
@@ -58,7 +59,7 @@
                     <input class="form-control form-control-sm"
                            placeholder="🔍 جستجو..."
                            @bind="searchTerm" @bind:event="oninput" />
-                    <button class="btn btn-sm btn-success text-nowrap" @onclick="ExportExcel" disabled="@isExporting">
+                    <button class="btn btn-sm btn-success text-nowrap" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
                         @if (isExporting)
                         {
                             <span class="spinner-border spinner-border-sm"></span>
@@ -121,8 +122,14 @@
                                         <span class="badge bg-info text-dark">@cat.ProductCount</span>
                                     </td>
                                     <td class="text-center">
-                                        <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(cat)">✏️ ویرایش</button>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteCategory(cat)">🗑️ حذف</button>
+                                        @if (Can(Permissions.ManageCategories))
+                                        {
+                                            <button class="btn btn-sm btn-warning" @onclick="() => StartEdit(cat)">✏️ ویرایش</button>
+                                        }
+                                        @if (Can(Permissions.DeleteCategories))
+                                        {
+                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteCategory(cat)">🗑️ حذف</button>
+                                        }
                                     </td>
                                 </tr>
                                 row++;
@@ -166,7 +173,7 @@
                 (c.Description ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
 
     // ===== چرخه‌ی حیات =====
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnPageInitializedAsync()
     {
         await LoadCategories();
     }
@@ -191,6 +198,12 @@
     // ===== افزودن =====
     private async Task AddCategory()
     {
+        if (!Can(Permissions.ManageCategories))
+        {
+            Toasts.ShowError("شما اجازهٔ افزودن دسته را ندارید");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(newName))
         {
             Toasts.ShowError("نام دسته نمی‌تواند خالی باشد.");
@@ -234,6 +247,12 @@
     // ===== ذخیره‌ی ویرایش =====
     private async Task SaveEdit()
     {
+        if (!Can(Permissions.ManageCategories))
+        {
+            Toasts.ShowError("شما اجازهٔ ویرایش دسته را ندارید");
+            return;
+        }
+
         if (editingCategory == null) return;
 
         if (string.IsNullOrWhiteSpace(newName))
@@ -276,6 +295,12 @@
     // ===== حذف =====
     private async Task DeleteCategory(CategoryListItem item)
     {
+        if (!Can(Permissions.DeleteCategories))
+        {
+            Toasts.ShowError("شما اجازهٔ حذف دسته را ندارید");
+            return;
+        }
+
         var message = $"آیا از حذف دسته «{item.Name}» مطمئن هستید؟";
         if (item.ProductCount > 0)
         {
@@ -312,6 +337,12 @@
     // ===== 🆕 خروجی Excel =====
     private async Task ExportExcel()
     {
+        if (!Can(Permissions.ExportExcel))
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
         try
         {
             isExporting = true;

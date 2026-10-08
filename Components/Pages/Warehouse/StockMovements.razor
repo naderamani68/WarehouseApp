@@ -1,5 +1,6 @@
 ﻿@page "/movements"
 @attribute [Authorize]
+@inherits PageBase
 @rendermode InteractiveServer
 @using WarehouseApp.Services
 @inject ExcelService Excel
@@ -17,7 +18,7 @@
 
 <div class="row mb-3">
     <div class="col-12 text-end">
-        <button class="btn btn-success" @onclick="ExportExcel" disabled="@isExporting">
+        <button class="btn btn-success" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
             @if (isExporting)
             {
                 <span class="spinner-border spinner-border-sm me-1"></span>
@@ -123,7 +124,10 @@
             <input class="form-control" @bind="note" />
         </div>
 
-        <button class="btn btn-primary" @onclick="AddMovement">ثبت حرکت</button>
+        @if (Can(Permissions.RegisterMovements))
+        {
+            <button class="btn btn-primary" @onclick="AddMovement">ثبت حرکت</button>
+        }
 
 @* ===== پیام‌های شناور — کنار دکمهٔ ثبت ===== *@
 <ToastHost Inline="true" />
@@ -142,7 +146,7 @@
     private int quantity;
     private string? note;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnPageInitializedAsync()
     {
         await LoadAll();
     }
@@ -160,6 +164,12 @@
 
     private async Task AddMovement()
     {
+        if (!Can(Permissions.RegisterMovements))
+        {
+            Toasts.ShowError("شما اجازهٔ ثبت حرکات انبار را ندارید");
+            return;
+        }
+
         if (selectedProductId == 0 || selectedWarehouseId == 0)
         {
             Toasts.ShowError("لطفاً محصول و انبار را انتخاب کنید");
@@ -242,6 +252,12 @@
 
     private async Task ExportExcel()
     {
+        if (!Can(Permissions.ExportExcel))
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
         try
         {
             isExporting = true;
