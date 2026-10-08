@@ -73,7 +73,17 @@
                 </NavLink>
             </div>
         }
-         @if (canManageRoles)         {             <div class="nav-item px-3">                 <NavLink class="nav-link" href="roles">                     <span class="bi bi-shield-lock-fill me-2" aria-hidden="true"></span>                     نقش‌ها و دسترسی‌ها                 </NavLink>             </div>         }
+         @if (canViewAuditLog)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="audit-log">
+                    <span class="bi bi-clock-history me-2" aria-hidden="true"></span>
+                    تاریخچهٔ عملیات
+                </NavLink>
+            </div>
+        }
+
+        @if (canManageRoles)         {             <div class="nav-item px-3">                 <NavLink class="nav-link" href="roles">                     <span class="bi bi-shield-lock-fill me-2" aria-hidden="true"></span>                     نقش‌ها و دسترسی‌ها                 </NavLink>             </div>         }
 
     </nav>
 </div>
@@ -81,6 +91,7 @@
 @code {
     private bool canManageRoles;
     private bool canManageEmployees;
+    private bool canViewAuditLog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,5 +100,6 @@
 
         canManageEmployees = (permissions & Permissions.ManageEmployees) == Permissions.ManageEmployees;
         canManageRoles = (permissions & Permissions.ManageRoles) == Permissions.ManageRoles;
+        canViewAuditLog = (permissions & Permissions.ViewAuditLog) == Permissions.ViewAuditLog;
     }
 }

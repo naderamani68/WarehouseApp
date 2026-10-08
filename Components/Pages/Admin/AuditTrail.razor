@@ -1,0 +1,363 @@
+﻿@page "/audit-log"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>تاریخچهٔ عملیات | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">📋 تاریخچهٔ عملیات</h3>
+
+@* ===== میزبان پیام‌های شناور ===== *@
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    @* ===== نوار فیلترها ===== *@
+    <div class="row g-3 mb-3">
+        <div class="col-md-2">
+            <label class="form-label">بازهٔ زمانی</label>
+            <select class="form-select" @bind="rangeFilter" @bind:after="ApplyFiltersAsync">
+                <option value="all">همه</option>
+                <option value="today">امروز</option>
+                <option value="7">۷ روز اخیر</option>
+                <option value="30">۳۰ روز اخیر</option>
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">کاربر</label>
+            <select class="form-select" @bind="userFilter" @bind:after="ApplyFiltersAsync">
+                <option value="">— همه —</option>
+                @foreach (var u in users)
+                {
+                    <option value="@u">@u</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">عملیات</label>
+            <select class="form-select" @bind="actionFilter" @bind:after="ApplyFiltersAsync">
+                <option value="">— همه —</option>
+                @foreach (var a in actions)
+                {
+                    <option value="@a">@a</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">موضوع</label>
+            <select class="form-select" @bind="entityFilter" @bind:after="ApplyFiltersAsync">
+                <option value="">— همه —</option>
+                @foreach (var e in entities)
+                {
+                    <option value="@e">@e</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">جست‌وجو</label>
+            <input class="form-control" placeholder="در جزئیات..." @bind="searchTerm" @bind:event="oninput" @bind:after="ApplyFiltersAsync" />
+        </div>
+
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-success w-100" @onclick="ExportExcelAsync"
+                    disabled="@(!CanExport || isExporting)">
+                @if (isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span>در حال ساخت...</span>
+                }
+                else
+                {
+                    <i class="bi bi-file-earmark-excel"></i>
+                    <span>خروجی Excel</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small">@totalCount رویداد پیدا شد</span>
+        <div class="d-flex align-items-center gap-2">
+            <label class="text-muted small mb-0">تعداد در صفحه:</label>
+            <select class="form-select form-select-sm" style="width: auto;" @bind="pageSize" @bind:after="ApplyFiltersAsync">
+                <option value="20">۲۰</option>
+                <option value="50">۵۰</option>
+                <option value="100">۱۰۰</option>
+            </select>
+        </div>
+    </div>
+
+    @* ===== جدول ===== *@
+    <table class="table table-striped table-sm align-middle">
+        <thead>
+            <tr>
+                <th>تاریخ و ساعت</th>
+                <th>کاربر</th>
+                <th>عملیات</th>
+                <th>موضوع</th>
+                <th>جزئیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (logs.Count == 0)
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted">رویدادی با این فیلترها پیدا نشد</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var log in logs)
+                {
+                    <tr>
+                        <td dir="ltr" class="text-nowrap">@ToPersianDateTime(log.At)</td>
+                        <td>@(string.IsNullOrWhiteSpace(log.Username) ? "—" : log.Username)</td>
+                        <td>
+                            @switch (log.Action)
+                            {
+                                case "افزودن":
+                                    <span class="badge bg-success">افزودن</span>
+                                    break;
+                                case "ویرایش":
+                                    <span class="badge bg-warning text-dark">ویرایش</span>
+                                    break;
+                                case "حذف":
+                                    <span class="badge bg-danger">حذف</span>
+                                    break;
+                                default:
+                                    <span class="badge bg-secondary">@log.Action</span>
+                                    break;
+                            }
+                        </td>
+                        <td>@log.Entity</td>
+                        <td class="text-muted small">@log.Details</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    @if (totalPages > 1)
+    {
+        <nav>
+            <ul class="pagination">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <button type="button" class="page-link" @onclick="() => GoToPageAsync(currentPage - 1)">قبلی</button>
+                </li>
+
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    var pageNum = i;
+                    <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                        <button type="button" class="page-link" @onclick="() => GoToPageAsync(pageNum)">@pageNum</button>
+                    </li>
+                }
+
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    <button type="button" class="page-link" @onclick="() => GoToPageAsync(currentPage + 1)">بعدی</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool canExport;
+    private bool CanExport => canExport;
+
+    private List<AuditLog> logs = new();
+    private List<string> users = new();
+    private List<string> actions = new();
+    private List<string> entities = new();
+
+    private string rangeFilter = "30";
+    private string userFilter = string.Empty;
+    private string actionFilter = string.Empty;
+    private string entityFilter = string.Empty;
+    private string searchTerm = string.Empty;
+
+    private int pageSize = 20;
+    private int currentPage = 1;
+    private int totalCount;
+    private int totalPages => pageSize <= 0 ? 1 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+    private bool isExporting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewAuditLog);
+        canExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        await LoadFilterOptionsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadFilterOptionsAsync()
+    {
+        users = await Db.AuditLogs
+            .Where(l => l.Username != null && l.Username != "")
+            .Select(l => l.Username!)
+            .Distinct()
+            .OrderBy(u => u)
+            .ToListAsync();
+
+        actions = await Db.AuditLogs
+            .Select(l => l.Action)
+            .Distinct()
+            .OrderBy(a => a)
+            .ToListAsync();
+
+        entities = await Db.AuditLogs
+            .Select(l => l.Entity)
+            .Distinct()
+            .OrderBy(e => e)
+            .ToListAsync();
+    }
+
+    private IQueryable<AuditLog> BuildQuery()
+    {
+        var query = Db.AuditLogs.AsQueryable();
+
+        var from = rangeFilter switch
+        {
+            "today" => DateTime.Today,
+            "7" => DateTime.Today.AddDays(-7),
+            "30" => DateTime.Today.AddDays(-30),
+            _ => (DateTime?)null
+        };
+
+        if (from.HasValue)
+        {
+            query = query.Where(l => l.At >= from.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(userFilter))
+        {
+            query = query.Where(l => l.Username == userFilter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(actionFilter))
+        {
+            query = query.Where(l => l.Action == actionFilter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(entityFilter))
+        {
+            query = query.Where(l => l.Entity == entityFilter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(l => l.Details != null && l.Details.Contains(searchTerm));
+        }
+
+        return query;
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        currentPage = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (page < 1 || page > totalPages || page == currentPage)
+        {
+            return;
+        }
+
+        currentPage = page;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = BuildQuery();
+
+        totalCount = await query.CountAsync();
+
+        logs = await query
+            .OrderByDescending(l => l.At)
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        if (!canExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = await BuildQuery().OrderByDescending(l => l.At).ToListAsync();
+
+            var columns = new Dictionary<string, Func<AuditLog, object?>>
+            {
+                ["تاریخ و ساعت"] = l => ToPersianDateTime(l.At),
+                ["کاربر"] = l => l.Username ?? "—",
+                ["عملیات"] = l => l.Action,
+                ["موضوع"] = l => l.Entity,
+                ["شناسه"] = l => l.EntityId,
+                ["جزئیات"] = l => l.Details
+            };
+
+            var title = $"تاریخچهٔ عملیات  |  تعداد: {data.Count}  |  تاریخ گزارش: {ToPersianDateTime(DateTime.Now)}";
+            var bytes = Excel.Export(data, "تاریخچه", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+            var fileName = $"AuditLog_{pc.GetYear(now):0000}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+            Toasts.ShowSuccess($"خروجی با {data.Count} رویداد ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static string ToPersianDateTime(DateTime value)
+    {
+        var pc = new PersianCalendar();
+        return $"{pc.GetYear(value):0000}/{pc.GetMonth(value):00}/{pc.GetDayOfMonth(value):00} - {value:HH:mm}";
+    }
+}
