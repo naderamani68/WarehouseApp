@@ -8,7 +8,6 @@
 @inject ToastService Toasts
 @using WarehouseApp.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext Db
 @inject IJSRuntime JS
 
 <h3>لیست انبارها</h3>
@@ -171,6 +170,7 @@ else if (Can(Permissions.ManageWarehouses))
             await Db.SaveChangesAsync();
             await LoadWarehouses();
 
+            await AuditAsync("افزودن", "انبار", warehouse.Id, $"انبار «{warehouse.Name}» ساخته شد");
             Toasts.ShowSuccess($"انبار «{warehouse.Name}» با موفقیت اضافه شد");
             ResetForm();
         }
@@ -216,6 +216,7 @@ else if (Can(Permissions.ManageWarehouses))
             await Db.SaveChangesAsync();
             await LoadWarehouses();
 
+            await AuditAsync("ویرایش", "انبار", editingWarehouse.Id, $"انبار «{editingWarehouse.Name}» ویرایش شد");
             Toasts.ShowSuccess($"انبار «{editingWarehouse.Name}» ویرایش شد");
             CancelEdit();
         }
@@ -244,6 +245,7 @@ else if (Can(Permissions.ManageWarehouses))
             Db.Warehouses.Remove(w);
             await Db.SaveChangesAsync();
             await LoadWarehouses();
+            await AuditAsync("حذف", "انبار", w.Id, $"انبار «{w.Name}» حذف شد");
             Toasts.ShowSuccess($"انبار «{w.Name}» حذف شد");
         }
         catch (Exception ex)

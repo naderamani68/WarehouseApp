@@ -10,7 +10,6 @@
 @using Microsoft.EntityFrameworkCore
 @using System.Globalization
 
-@inject ApplicationDbContext Db
 
 <h3>📦 حرکات انبار</h3>
 
@@ -230,6 +229,7 @@
             await Db.SaveChangesAsync();
             await LoadAll();
 
+            await AuditAsync("افزودن", "حرکت انبار", movement.Id, $"{(selectedType == MovementType.In ? "ورود" : "خروج")} {quantity} عدد از «{product?.Name}» ثبت شد");
             Toasts.ShowSuccess("حرکت با موفقیت ثبت شد ✅");
             ResetForm();
         }

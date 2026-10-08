@@ -2,7 +2,6 @@
 @attribute [Authorize]
 @inherits PageBase
 @rendermode InteractiveServer
-@inject ApplicationDbContext Db
 @inject IJSRuntime JS
 @using WarehouseApp.Services
 @using System.Globalization
@@ -222,6 +221,7 @@
             await Db.SaveChangesAsync();
             await LoadCategories();
 
+            await AuditAsync("افزودن", "دسته‌بندی", cat.Id, $"دستهٔ «{cat.Name}» ساخته شد");
             Toasts.ShowSuccess($"دسته «{cat.Name}» با موفقیت اضافه شد ✅");
             ResetForm();
         }
@@ -276,6 +276,7 @@
             await Db.SaveChangesAsync();
             await LoadCategories();
 
+            await AuditAsync("ویرایش", "دسته‌بندی", entity.Id, $"دستهٔ «{entity.Name}» ویرایش شد");
             Toasts.ShowSuccess($"دسته «{entity.Name}» با موفقیت ویرایش شد ✅");
             CancelEdit();
         }
@@ -319,6 +320,7 @@
             await Db.SaveChangesAsync();
             await LoadCategories();
 
+            await AuditAsync("حذف", "دسته‌بندی", item.Id, $"دستهٔ «{item.Name}» حذف شد");
             Toasts.ShowSuccess($"دسته «{item.Name}» حذف شد 🗑️");
         }
         catch (Exception ex)

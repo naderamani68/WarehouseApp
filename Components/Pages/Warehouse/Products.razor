@@ -5,7 +5,6 @@
 @using System.Globalization
 @using WarehouseApp.Data
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext Db
 
 @using WarehouseApp.Services
 @inject ExcelService Excel
@@ -284,6 +283,7 @@ else if (Can(Permissions.ManageProducts))
             await Db.SaveChangesAsync();
             await LoadProducts();
 
+            await AuditAsync("افزودن", "محصول", newProduct.Id, $"محصول «{newProduct.Name}» ساخته شد");
             Toasts.ShowSuccess($"محصول «{newProduct.Name}» با موفقیت اضافه شد");
             ResetForm();
         }
@@ -326,6 +326,7 @@ else if (Can(Permissions.ManageProducts))
             await Db.SaveChangesAsync();
             await LoadProducts();
 
+            await AuditAsync("ویرایش", "محصول", editingProduct.Id, $"محصول «{editingProduct.Name}» ویرایش شد");
             Toasts.ShowSuccess($"محصول «{editingProduct.Name}» ویرایش شد");
             CancelEdit();
         }
@@ -354,6 +355,7 @@ else if (Can(Permissions.ManageProducts))
             Db.Products.Remove(product);
             await Db.SaveChangesAsync();
             await LoadProducts();
+            await AuditAsync("حذف", "محصول", product.Id, $"محصول «{product.Name}» حذف شد");
             Toasts.ShowSuccess($"محصول «{product.Name}» حذف شد");
         }
         catch (Exception ex)

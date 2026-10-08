@@ -91,6 +91,16 @@ public class AuthService
         user.FailedLoginCount = 0;
         user.LockoutUntil = null;
         user.LastLoginAt = DateTime.Now;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Action = "ورود",
+            Entity = "حساب کاربری",
+            EntityId = user.Id,
+            Details = $"کاربر «{user.FullName}» وارد سیستم شد",
+            Username = user.Username
+        });
+
         await _db.SaveChangesAsync();
 
         return new AuthResult { Success = true, Employee = user };
@@ -208,6 +218,16 @@ public class AuthService
 
         employee.PasswordHash = _hasher.HashPassword(employee, newPassword);
         employee.MustChangePassword = false;
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Action = "ویرایش",
+            Entity = "حساب کاربری",
+            EntityId = employee.Id,
+            Details = "رمز عبور توسط خود کاربر تغییر کرد",
+            Username = employee.Username
+        });
+
         await _db.SaveChangesAsync();
 
         return new AuthResult { Success = true, Employee = employee };
@@ -224,6 +244,16 @@ public class AuthService
 
         employee.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
         employee.Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Action = "ویرایش",
+            Entity = "پروفایل",
+            EntityId = employee.Id,
+            Details = "اطلاعات تماس توسط خود کاربر ویرایش شد",
+            Username = employee.Username
+        });
+
         await _db.SaveChangesAsync();
 
         return new AuthResult { Success = true, Employee = employee };

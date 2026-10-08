@@ -23,8 +23,12 @@ public abstract class PageBase : ComponentBase
 
     [Inject] protected NavigationManager Nav { get; set; } = default!;
 
+    [Inject] protected ApplicationDbContext Db { get; set; } = default!;
+
     /// <summary>اختیارات کاربر جاری</summary>
     protected Permissions MyPermissions { get; private set; } = Permissions.None;
+
+    private string? currentUsername;
 
     /// <summary>آیا کاربر این اختیار را دارد؟</summary>
     protected bool Can(Permissions permission) => (MyPermissions & permission) == permission;
@@ -33,9 +37,25 @@ public abstract class PageBase : ComponentBase
     protected bool CanAny(params Permissions[] anyOf)
         => anyOf.Any(p => (MyPermissions & p) == p);
 
+    /// <summary>ثبت یک رویداد در تاریخچهٔ عملیات</summary>
+    protected async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = currentUsername
+        });
+
+        await Db.SaveChangesAsync();
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
 
         // اگر رمز کاربر موقت است، اول باید آن را عوض کند
         if (await Access.MustChangePasswordAsync(user))
