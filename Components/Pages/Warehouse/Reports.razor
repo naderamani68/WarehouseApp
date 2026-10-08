@@ -5,6 +5,11 @@
 
 @using WarehouseApp.Data
 @using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@using WarehouseApp.Services
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
 
 <h3>📊 داشبورد گزارش‌ها</h3>
 
@@ -173,6 +178,106 @@
     </div>
 </div>
 
+@* ================= موجودی کالا در انبارها ================= *@
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">🏬 موجودی کالا در انبارها</h5>
+        <button class="btn btn-sm btn-light" @onclick="ExportStockExcel" disabled="@(!Can(Permissions.ExportExcel) || isStockExporting)">
+            @if (isStockExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+    <div class="card-body">
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                <label class="form-label small mb-1">کالا</label>
+                <select class="form-select form-select-sm" @bind="stockProductFilter">
+                    <option value="0">— همهٔ کالاها —</option>
+                    @foreach (var p in stockProducts)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label small mb-1">انبار</label>
+                <select class="form-select form-select-sm" @bind="stockWarehouseFilter">
+                    <option value="0">— همهٔ انبارها —</option>
+                    @foreach (var w in stockWarehouses)
+                    {
+                        <option value="@w.Id">@w.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-2 d-flex align-items-center">
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" id="onlyNonZero" @bind="onlyNonZeroStock" />
+                    <label class="form-check-label small" for="onlyNonZero">فقط غیرصفر</label>
+                </div>
+            </div>
+
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100" @onclick="ClearStockFilters">پاک‌کردن فیلترها</button>
+            </div>
+        </div>
+
+        <div class="text-muted small mb-2">
+            @filteredStockRows.Count ردیف &nbsp;|&nbsp; مجموع موجودی: <strong>@filteredStockRows.Sum(r => r.Quantity)</strong> عدد
+        </div>
+
+        <div style="max-height: 420px; overflow-y: auto;">
+            <table class="table table-sm table-striped mb-0">
+                <thead class="table-light" style="position: sticky; top: 0;">
+                    <tr>
+                        <th>کالا</th>
+                        <th>انبار</th>
+                        <th style="width: 120px;">موجودی</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredStockRows.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted">ردیفی با این فیلترها پیدا نشد</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var r in filteredStockRows)
+                        {
+                            <tr>
+                                <td>@r.ProductName</td>
+                                <td>@r.WarehouseName</td>
+                                <td>
+                                    @if (r.Quantity == 0)
+                                    {
+                                        <span class="text-muted">۰</span>
+                                    }
+                                    else
+                                    {
+                                        <strong>@r.Quantity</strong>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 @code {
     private int totalProducts;
     private int totalWarehouses;
@@ -183,6 +288,15 @@
     private List<Product> lowStockProducts = new();
     private List<StockMovement> recentMovements = new();
     private List<TopProductItem> topProducts = new();
+
+    // ===== موجودی کالا در انبارها =====
+    private List<StockRow> stockRows = new();
+    private List<Product> stockProducts = new();
+    private List<Warehouse> stockWarehouses = new();
+    private int stockProductFilter;
+    private int stockWarehouseFilter;
+    private bool onlyNonZeroStock = true;
+    private bool isStockExporting;
 
     protected override async Task OnPageInitializedAsync()
     {
@@ -248,6 +362,134 @@
                     TotalOut = x.TotalOut
                 })
             .ToList();
+
+        // ===== موجودی کالا در انبارها =====
+        stockProducts = await Db.Products.OrderBy(p => p.Name).ToListAsync();
+        stockWarehouses = await Db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync();
+
+        var stockGrouped = await Db.StockMovements
+            .GroupBy(m => new { m.ProductId, m.WarehouseId })
+            .Select(g => new
+            {
+                g.Key.ProductId,
+                g.Key.WarehouseId,
+                ProductName = g.First().Product!.Name ?? "—",
+                WarehouseName = g.First().Warehouse!.Name ?? "—",
+                Quantity = g.Sum(x => x.Type == MovementType.In ? x.Quantity : -x.Quantity)
+            })
+            .ToListAsync();
+
+        stockRows = stockGrouped
+            .Select(x => new StockRow
+            {
+                ProductId = x.ProductId,
+                WarehouseId = x.WarehouseId,
+                ProductName = x.ProductName,
+                WarehouseName = x.WarehouseName,
+                Quantity = x.Quantity
+            })
+            .ToList();
+    }
+
+    private List<StockRow> filteredStockRows
+    {
+        get
+        {
+            var rows = stockRows
+                .Where(r => stockProductFilter == 0 || r.ProductId == stockProductFilter)
+                .Where(r => stockWarehouseFilter == 0 || r.WarehouseId == stockWarehouseFilter)
+                .ToList();
+
+            if (!onlyNonZeroStock)
+            {
+                // نمایش همهٔ ترکیب‌های کالا × انبار، حتی با موجودی صفر
+                var existing = rows.Select(r => (r.ProductId, r.WarehouseId)).ToHashSet();
+                var productsToShow = stockProducts.Where(p => stockProductFilter == 0 || p.Id == stockProductFilter);
+                var warehousesToShow = stockWarehouses.Where(w => stockWarehouseFilter == 0 || w.Id == stockWarehouseFilter);
+
+                foreach (var p in productsToShow)
+                {
+                    foreach (var w in warehousesToShow)
+                    {
+                        if (!existing.Contains((p.Id, w.Id)))
+                        {
+                            rows.Add(new StockRow
+                            {
+                                ProductId = p.Id,
+                                WarehouseId = w.Id,
+                                ProductName = p.Name ?? "—",
+                                WarehouseName = w.Name,
+                                Quantity = 0
+                            });
+                        }
+                    }
+                }
+            }
+
+            return rows
+                .OrderBy(r => r.ProductName)
+                .ThenBy(r => r.WarehouseName)
+                .ToList();
+        }
+    }
+
+    private void ClearStockFilters()
+    {
+        stockProductFilter = 0;
+        stockWarehouseFilter = 0;
+        onlyNonZeroStock = true;
+    }
+
+    private async Task ExportStockExcel()
+    {
+        if (!Can(Permissions.ExportExcel))
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isStockExporting = true;
+
+            var data = filteredStockRows;
+
+            var columns = new Dictionary<string, Func<StockRow, object?>>
+            {
+                ["کالا"] = r => r.ProductName,
+                ["انبار"] = r => r.WarehouseName,
+                ["موجودی"] = r => r.Quantity
+            };
+
+            var pcNow = new PersianCalendar();
+            var now = DateTime.Now;
+            var title = $"موجودی کالا در انبارها  |  ردیف: {data.Count}  |  مجموع: {data.Sum(r => r.Quantity)}  |  تاریخ: {pcNow.GetYear(now):0000}/{pcNow.GetMonth(now):00}/{pcNow.GetDayOfMonth(now):00}";
+
+            var bytes = Excel.Export(data, "موجودی انبارها", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            var fileName = $"StockByWarehouse_{pcNow.GetYear(now):0000}{pcNow.GetMonth(now):00}{pcNow.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+            Toasts.ShowSuccess($"خروجی با {data.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isStockExporting = false;
+        }
+    }
+
+    private class StockRow
+    {
+        public int ProductId { get; set; }
+        public int WarehouseId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string WarehouseName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
     }
 
     private class TopProductItem

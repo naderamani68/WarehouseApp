@@ -1,4 +1,4 @@
-﻿@page "/movements"
+@page "/movements"
 @attribute [Authorize]
 @inherits PageBase
 @rendermode InteractiveServer
@@ -10,74 +10,9 @@
 @using Microsoft.EntityFrameworkCore
 @using System.Globalization
 
-
 <h3>📦 حرکات انبار</h3>
 
-<h4>لیست حرکات</h4>
-
-<div class="row mb-3">
-    <div class="col-12 text-end">
-        <button class="btn btn-success" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
-            @if (isExporting)
-            {
-                <span class="spinner-border spinner-border-sm me-1"></span>
-                <span>در حال ساخت...</span>
-            }
-            else
-            {
-                <i class="bi bi-file-earmark-excel"></i>
-                <span>خروجی Excel</span>
-            }
-        </button>
-    </div>
-</div>
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>تاریخ</th>
-            <th>محصول</th>
-            <th>انبار</th>
-            <th>نوع</th>
-            <th>تعداد</th>
-            <th>یادداشت</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (movements.Count == 0)
-        {
-            <tr>
-                <td colspan="6" class="text-center text-muted">هیچ حرکتی ثبت نشده است</td>
-            </tr>
-        }
-        else
-        {
-            @foreach (var m in movements)
-            {
-                <tr>
-                    <td>@ToPersianDateTime(m.MovementDate)</td>
-                    <td>@(m.Product?.Name ?? "-")</td>
-                    <td>@(m.Warehouse?.Name ?? "-")</td>
-                    <td>
-                        @if (m.Type == MovementType.In)
-                        {
-                            <span class="badge bg-success">ورود</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-danger">خروج</span>
-                        }
-                    </td>
-                    <td>@m.Quantity</td>
-                    <td>@(m.Note ?? "-")</td>
-                </tr>
-            }
-        }
-    </tbody>
-</table>
-
-<hr />
-
+@* ================= فرم ثبت حرکت ================= *@
 <h4>ثبت حرکت جدید</h4>
 
 <div class="row">
@@ -85,18 +20,18 @@
 
         <div class="mb-3">
             <label class="form-label">محصول:</label>
-            <select class="form-select" @bind="selectedProductId">
+            <select class="form-select" @bind="selectedProductId" @bind:after="OnProductChangedAsync">
                 <option value="0">-- انتخاب کنید --</option>
                 @foreach (var p in products)
                 {
-                    <option value="@p.Id">@p.Name (موجودی فعلی: @p.Quantity)</option>
+                    <option value="@p.Id">@p.Name (موجودی کل: @p.Quantity)</option>
                 }
             </select>
         </div>
 
         <div class="mb-3">
             <label class="form-label">انبار:</label>
-            <select class="form-select" @bind="selectedWarehouseId">
+            <select class="form-select" @bind="selectedWarehouseId" @bind:after="OnWarehouseChanged">
                 <option value="0">-- انتخاب کنید --</option>
                 @foreach (var w in warehouses)
                 {
@@ -104,6 +39,56 @@
                 }
             </select>
         </div>
+
+        @* ===== موجودی زندهٔ همین کالا در همین انبار ===== *@
+        @if (selectedProductId > 0 && selectedWarehouseId > 0)
+        {
+            <div class="alert @StockAlertClass py-2">
+                موجودی <strong>«@SelectedProductName»</strong> در انبار <strong>«@SelectedWarehouseName»</strong>:
+                <strong>@stockInSelectedWarehouse</strong> عدد
+
+                @if (selectedType == MovementType.Out && quantity > stockInSelectedWarehouse)
+                {
+                    <div class="small mt-1">⚠️ تعداد درخواستی از موجودی این انبار بیشتر است</div>
+                }
+            </div>
+        }
+
+        @* ===== موجودی همین کالا در همهٔ انبارها ===== *@
+        @if (selectedProductId > 0 && productStock.Count > 0)
+        {
+            <details class="stock-help mb-3">
+                <summary>موجودی «@SelectedProductName» در همهٔ انبارها</summary>
+                <div class="stock-help-content">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>انبار</th>
+                                <th>موجودی</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in productStock)
+                            {
+                                <tr>
+                                    <td>@s.WarehouseName</td>
+                                    <td>
+                                        @if (s.Quantity == 0)
+                                        {
+                                            <span class="text-muted">۰</span>
+                                        }
+                                        else
+                                        {
+                                            <strong>@s.Quantity</strong>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
 
         <div class="mb-3">
             <label class="form-label">نوع حرکت:</label>
@@ -128,11 +113,148 @@
             <button class="btn btn-primary" @onclick="AddMovement">ثبت حرکت</button>
         }
 
-@* ===== پیام‌های شناور — کنار دکمهٔ ثبت ===== *@
-<ToastHost Inline="true" />
+        @* ===== پیام‌های شناور — کنار دکمهٔ ثبت ===== *@
+        <ToastHost Inline="true" />
 
     </div>
 </div>
+
+<hr />
+
+@* ================= لیست حرکات ================= *@
+<h4>لیست حرکات</h4>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-3">
+        <label class="form-label small mb-1">فیلتر محصول</label>
+        <select class="form-select form-select-sm" @bind="filterProductId" @bind:after="ResetPaging">
+            <option value="0">— همهٔ محصولات —</option>
+            @foreach (var p in products)
+            {
+                <option value="@p.Id">@p.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label small mb-1">فیلتر انبار</label>
+        <select class="form-select form-select-sm" @bind="filterWarehouseId" @bind:after="ResetPaging">
+            <option value="0">— همهٔ انبارها —</option>
+            @foreach (var w in warehouses)
+            {
+                <option value="@w.Id">@w.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label small mb-1">نوع</label>
+        <select class="form-select form-select-sm" @bind="filterType" @bind:after="ResetPaging">
+            <option value="">— همه —</option>
+            <option value="In">ورود</option>
+            <option value="Out">خروج</option>
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label small mb-1">تعداد در صفحه</label>
+        <select class="form-select form-select-sm" @bind="pageSize" @bind:after="ResetPaging">
+            <option value="10">۱۰</option>
+            <option value="25">۲۵</option>
+            <option value="50">۵۰</option>
+        </select>
+    </div>
+
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-success btn-sm w-100" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="text-muted small">@filteredMovements.Count حرکت پیدا شد</span>
+    @if (filterProductId > 0 || filterWarehouseId > 0 || !string.IsNullOrEmpty(filterType))
+    {
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">پاک‌کردن فیلترها</button>
+    }
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>تاریخ</th>
+            <th>محصول</th>
+            <th>انبار</th>
+            <th>نوع</th>
+            <th>تعداد</th>
+            <th>یادداشت</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (pagedMovements.Count == 0)
+        {
+            <tr>
+                <td colspan="6" class="text-center text-muted">هیچ حرکتی با این فیلترها پیدا نشد</td>
+            </tr>
+        }
+        else
+        {
+            @foreach (var m in pagedMovements)
+            {
+                <tr>
+                    <td>@ToPersianDateTime(m.MovementDate)</td>
+                    <td>@(m.Product?.Name ?? "-")</td>
+                    <td>@(m.Warehouse?.Name ?? "-")</td>
+                    <td>
+                        @if (m.Type == MovementType.In)
+                        {
+                            <span class="badge bg-success">ورود</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">خروج</span>
+                        }
+                    </td>
+                    <td>@m.Quantity</td>
+                    <td>@(m.Note ?? "-")</td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@if (totalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                <button type="button" class="page-link" @onclick="() => currentPage--">قبلی</button>
+            </li>
+
+            @for (int i = 1; i <= totalPages; i++)
+            {
+                var pageNum = i;
+                <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                    <button type="button" class="page-link" @onclick="() => currentPage = pageNum">@pageNum</button>
+                </li>
+            }
+
+            <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                <button type="button" class="page-link" @onclick="() => currentPage++">بعدی</button>
+            </li>
+        </ul>
+    </nav>
+}
 
 @code {
     private List<StockMovement> movements = new();
@@ -144,6 +266,46 @@
     private MovementType selectedType = MovementType.In;
     private int quantity;
     private string? note;
+
+    // ===== نمایش موجودی =====
+    private int stockInSelectedWarehouse;
+    private List<WarehouseStock> productStock = new();
+
+    // ===== فیلترهای لیست =====
+    private int filterProductId;
+    private int filterWarehouseId;
+    private string filterType = string.Empty;
+    private int pageSize = 10;
+    private int currentPage = 1;
+
+    private bool isExporting;
+
+    private class WarehouseStock
+    {
+        public string WarehouseName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+    }
+
+    // ===== محاسبات =====
+    private string SelectedProductName => products.FirstOrDefault(p => p.Id == selectedProductId)?.Name ?? "—";
+
+    private string SelectedWarehouseName => warehouses.FirstOrDefault(w => w.Id == selectedWarehouseId)?.Name ?? "—";
+
+    private string StockAlertClass
+        => selectedType == MovementType.Out && quantity > stockInSelectedWarehouse ? "alert-danger" : "alert-info";
+
+    private List<StockMovement> filteredMovements => movements
+        .Where(m => filterProductId == 0 || m.ProductId == filterProductId)
+        .Where(m => filterWarehouseId == 0 || m.WarehouseId == filterWarehouseId)
+        .Where(m => string.IsNullOrEmpty(filterType) || m.Type.ToString() == filterType)
+        .ToList();
+
+    private List<StockMovement> pagedMovements => filteredMovements
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    private int totalPages => pageSize <= 0 ? 1 : (int)Math.Ceiling((double)filteredMovements.Count / pageSize);
 
     protected override async Task OnPageInitializedAsync()
     {
@@ -159,6 +321,54 @@
             .Include(m => m.Warehouse)
             .OrderByDescending(m => m.MovementDate)
             .ToListAsync();
+
+        RefreshStockView();
+    }
+
+    /// <summary>محاسبهٔ موجودی کالای انتخاب‌شده در انبارها (از روی حرکات بارگذاری‌شده)</summary>
+    private void RefreshStockView()
+    {
+        stockInSelectedWarehouse = 0;
+        productStock = new List<WarehouseStock>();
+
+        if (selectedProductId == 0)
+        {
+            return;
+        }
+
+        productStock = warehouses
+            .Select(w => new WarehouseStock
+            {
+                WarehouseName = w.Name,
+                Quantity = movements
+                    .Where(m => m.ProductId == selectedProductId && m.WarehouseId == w.Id)
+                    .Sum(m => m.Type == MovementType.In ? m.Quantity : -m.Quantity)
+            })
+            .Where(s => s.Quantity != 0 || warehouses.Count <= 8)
+            .ToList();
+
+        stockInSelectedWarehouse = selectedWarehouseId == 0
+            ? 0
+            : productStock.FirstOrDefault(s => s.WarehouseName == warehouses.First(w => w.Id == selectedWarehouseId).Name)?.Quantity ?? 0;
+    }
+
+    private async Task OnProductChangedAsync()
+    {
+        selectedWarehouseId = 0;
+        RefreshStockView();
+        await Task.CompletedTask;
+    }
+
+    private void OnWarehouseChanged() => RefreshStockView();
+
+    private void ResetPaging() => currentPage = 1;
+
+    private void ClearFilters()
+    {
+        filterProductId = 0;
+        filterWarehouseId = 0;
+        filterType = string.Empty;
+        currentPage = 1;
     }
 
     private async Task AddMovement()
@@ -227,9 +437,11 @@
             Db.StockMovements.Add(movement);
             Db.Products.Update(product);
             await Db.SaveChangesAsync();
+
+            await AuditAsync("افزودن", "حرکت انبار", movement.Id, $"{(selectedType == MovementType.In ? "ورود" : "خروج")} {quantity} عدد از «{product.Name}» در انبار «{SelectedWarehouseName}» ثبت شد");
+
             await LoadAll();
 
-            await AuditAsync("افزودن", "حرکت انبار", movement.Id, $"{(selectedType == MovementType.In ? "ورود" : "خروج")} {quantity} عدد از «{product?.Name}» ثبت شد");
             Toasts.ShowSuccess("حرکت با موفقیت ثبت شد ✅");
             ResetForm();
         }
@@ -246,9 +458,8 @@
         selectedType = MovementType.In;
         quantity = 0;
         note = null;
+        RefreshStockView();
     }
-
-    private bool isExporting = false;
 
     private async Task ExportExcel()
     {
@@ -262,7 +473,8 @@
         {
             isExporting = true;
 
-            var data = movements;   // لیست لود شده (همه‌ی حرکات، مرتب‌شده نزولی بر اساس تاریخ)
+            // ✅ فقط حرکات فیلترشده
+            var data = filteredMovements;
 
             var columns = new Dictionary<string, Func<StockMovement, object?>>
                 {
@@ -275,9 +487,27 @@
                     ["یادداشت"] = m => m.Note
                 };
 
-            var title = $"گزارش حرکات انبار  |  تاریخ: {GetPersianDateTimeString()}";
+            var titleParts = new List<string> { "گزارش حرکات انبار" };
 
-            var bytes = Excel.Export(data, "حرکات انبار", columns, title);
+            if (filterProductId > 0)
+            {
+                titleParts.Add($"محصول: {products.FirstOrDefault(p => p.Id == filterProductId)?.Name}");
+            }
+
+            if (filterWarehouseId > 0)
+            {
+                titleParts.Add($"انبار: {warehouses.FirstOrDefault(w => w.Id == filterWarehouseId)?.Name}");
+            }
+
+            if (!string.IsNullOrEmpty(filterType))
+            {
+                titleParts.Add($"نوع: {(filterType == "In" ? "ورود" : "خروج")}");
+            }
+
+            titleParts.Add($"تعداد: {data.Count}");
+            titleParts.Add($"تاریخ: {GetPersianDateTimeString()}");
+
+            var bytes = Excel.Export(data, "حرکات انبار", columns, string.Join("  |  ", titleParts));
             var base64 = Convert.ToBase64String(bytes);
 
             var pc = new PersianCalendar();
