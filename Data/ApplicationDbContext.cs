@@ -16,6 +16,7 @@ namespace WarehouseApp.Data
         public DbSet<Employee> Employees { get; set; }   // کارمندان
         public DbSet<AuditLog> AuditLogs { get; set; }   // تاریخچهٔ عملیات
         public DbSet<Role> Roles { get; set; }           // نقش‌ها و اختیارات
+        public DbSet<Party> Parties { get; set; }         // مشتریان و تأمین‌کنندگان
 
         // 👇 متد جدید برای تنظیم رفتار حذف دسته
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -39,6 +40,11 @@ namespace WarehouseApp.Data
             // نام نقش باید یکتا باشد
             modelBuilder.Entity<Role>()
                 .HasIndex(r => r.Name)
+                .IsUnique();
+
+            // کد طرف حساب باید یکتا باشد
+            modelBuilder.Entity<Party>()
+                .HasIndex(p => p.Code)
                 .IsUnique();
 
             // ارتباط کارمند با نقش — اگر نقش حذف شود، نقش کارمند خالی می‌شود

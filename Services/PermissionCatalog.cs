@@ -23,6 +23,9 @@ public static class PermissionCatalog
         new(Permissions.ExportExcel,       "خروجی اکسل",                 "گزارش‌ها"),
         new(Permissions.ViewReports,       "دیدن گزارش‌ها",              "گزارش‌ها"),
         new(Permissions.ViewAuditLog,      "دیدن تاریخچهٔ عملیات",       "مدیریت سیستم"),
+        new(Permissions.ViewParties,       "دیدن مشتریان و تأمین‌کنندگان",  "مشتریان و تأمین‌کنندگان"),
+        new(Permissions.ManageParties,     "افزودن و ویرایش طرف حساب",      "مشتریان و تأمین‌کنندگان"),
+        new(Permissions.DeleteParties,     "حذف طرف حساب",                  "مشتریان و تأمین‌کنندگان"),
         new(Permissions.ManageEmployees,   "مدیریت کارمندان",            "مدیریت سیستم"),
         new(Permissions.ManageRoles,       "مدیریت نقش‌ها و دسترسی‌ها",  "مدیریت سیستم")
     };

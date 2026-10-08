@@ -49,6 +49,15 @@ public enum Permissions
     /// <summary>دیدن تاریخچهٔ عملیات</summary>
     ViewAuditLog = 1 << 12,
 
+    /// <summary>دیدن مشتریان و تأمین‌کنندگان</summary>
+    ViewParties = 1 << 13,
+
+    /// <summary>افزودن و ویرایش مشتریان و تأمین‌کنندگان</summary>
+    ManageParties = 1 << 14,
+
+    /// <summary>حذف مشتریان و تأمین‌کنندگان</summary>
+    DeleteParties = 1 << 15,
+
     /// <summary>همهٔ اختیارات</summary>
     All = ViewData | ManageProducts | DeleteProducts | ManageCategories | DeleteCategories
         | ManageWarehouses | DeleteWarehouses | RegisterMovements | ExportExcel

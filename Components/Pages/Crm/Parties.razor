@@ -1,0 +1,598 @@
+@page "/crm/parties"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>مشتریان و تأمین‌کنندگان | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">🤝 مشتریان و تأمین‌کنندگان</h3>
+
+@* ===== میزبان پیام‌های شناور ===== *@
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    @* ================= فرم افزودن / ویرایش ================= *@
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "افزودن طرف حساب جدید" : $"ویرایش: {editing.Name}")</h5>
+
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">کد طرف حساب</label>
+                <input class="form-control" dir="ltr" @bind="formCode" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">نام شخص یا شرکت</label>
+                <input class="form-control" @bind="formName" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نوع</label>
+                <select class="form-select" @bind="formType">
+                    <option value="@PartyType.Customer">مشتری</option>
+                    <option value="@PartyType.Supplier">تأمین‌کننده</option>
+                    <option value="@PartyType.Both">هر دو</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-center">
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" id="partyActive" @bind="formIsActive" />
+                    <label class="form-check-label" for="partyActive">فعال</label>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">نام رابط</label>
+                <input class="form-control" @bind="formContactPerson" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تلفن</label>
+                <input class="form-control" dir="ltr" @bind="formPhone" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">موبایل</label>
+                <input class="form-control" dir="ltr" @bind="formMobile" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">ایمیل</label>
+                <input class="form-control" dir="ltr" @bind="formEmail" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">کد / شناسهٔ ملی</label>
+                <input class="form-control" dir="ltr" @bind="formNationalId" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">کد اقتصادی</label>
+                <input class="form-control" dir="ltr" @bind="formEconomicCode" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">شهر</label>
+                <input class="form-control" @bind="formCity" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">کد پستی</label>
+                <input class="form-control" dir="ltr" @bind="formPostalCode" />
+            </div>
+
+            <div class="col-md-8">
+                <label class="form-label">آدرس</label>
+                <input class="form-control" @bind="formAddress" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">یادداشت</label>
+                <input class="form-control" @bind="formNotes" />
+            </div>
+        </div>
+
+        <div class="mt-3">
+            @if (CanManage)
+            {
+                if (editing is null)
+                {
+                    <button type="button" class="btn btn-primary" @onclick="SaveAsync">افزودن</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-success" @onclick="SaveAsync">ذخیره تغییرات</button>
+                    <button type="button" class="btn btn-secondary" @onclick="ResetForm">انصراف</button>
+                }
+            }
+        </div>
+    </div>
+
+    @* ================= فیلترها ================= *@
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <input class="form-control" placeholder="🔍 جستجو در نام، کد، تلفن یا شهر..."
+                   @bind="searchTerm" @bind:event="oninput" @bind:after="ResetPaging" />
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="typeFilter" @bind:after="ResetPaging">
+                <option value="">— همهٔ انواع —</option>
+                <option value="Customer">مشتری</option>
+                <option value="Supplier">تأمین‌کننده</option>
+                <option value="Both">هر دو</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="statusFilter" @bind:after="ResetPaging">
+                <option value="">— همه —</option>
+                <option value="active">فقط فعال</option>
+                <option value="inactive">فقط غیرفعال</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" @bind="pageSize" @bind:after="ResetPaging">
+                <option value="10">۱۰ در صفحه</option>
+                <option value="25">۲۵ در صفحه</option>
+                <option value="50">۵۰ در صفحه</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-success w-100" @onclick="ExportExcelAsync" disabled="@(!CanExport || isExporting)">
+                @if (isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span>در حال ساخت...</span>
+                }
+                else
+                {
+                    <i class="bi bi-file-earmark-excel"></i>
+                    <span>خروجی Excel</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small">@filteredParties.Count طرف حساب پیدا شد</span>
+        @if (!string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(typeFilter) || !string.IsNullOrEmpty(statusFilter))
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">پاک‌کردن فیلترها</button>
+        }
+    </div>
+
+    @* ================= جدول ================= *@
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>کد</th>
+                <th>نام</th>
+                <th>نوع</th>
+                <th>رابط</th>
+                <th>تلفن</th>
+                <th>شهر</th>
+                <th>وضعیت</th>
+                <th>عملیات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (pagedParties.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted">طرف حسابی با این فیلترها پیدا نشد</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var item in pagedParties)
+                {
+                    <tr>
+                        <td dir="ltr">@item.Code</td>
+                        <td>@item.Name</td>
+                        <td>
+                            @switch (item.Type)
+                            {
+                                case PartyType.Customer:
+                                    <span class="badge bg-info text-dark">مشتری</span>
+                                    break;
+                                case PartyType.Supplier:
+                                    <span class="badge bg-warning text-dark">تأمین‌کننده</span>
+                                    break;
+                                default:
+                                    <span class="badge bg-primary">هر دو</span>
+                                    break;
+                            }
+                        </td>
+                        <td class="text-muted small">@(item.ContactPerson ?? "—")</td>
+                        <td dir="ltr">@(item.Mobile ?? item.Phone ?? "—")</td>
+                        <td>@(item.City ?? "—")</td>
+                        <td>
+                            @if (item.IsActive)
+                            {
+                                <span class="badge bg-success">فعال</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">غیرفعال</span>
+                            }
+                        </td>
+                        <td>
+                            @if (CanManage)
+                            {
+                                <button type="button" class="btn btn-sm btn-warning" @onclick="() => StartEdit(item)">ویرایش</button>
+                            }
+                            @if (CanDelete)
+                            {
+                                <button type="button" class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(item)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    @if (totalPages > 1)
+    {
+        <nav>
+            <ul class="pagination">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <button type="button" class="page-link" @onclick="() => currentPage--">قبلی</button>
+                </li>
+
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    var pageNum = i;
+                    <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                        <button type="button" class="page-link" @onclick="() => currentPage = pageNum">@pageNum</button>
+                    </li>
+                }
+
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    <button type="button" class="page-link" @onclick="() => currentPage++">بعدی</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool CanDelete;
+    private bool CanExport;
+
+    private List<Party> parties = new();
+
+    private Party? editing;
+
+    private string formCode = string.Empty;
+    private string formName = string.Empty;
+    private PartyType formType = PartyType.Customer;
+    private string formContactPerson = string.Empty;
+    private string formPhone = string.Empty;
+    private string formMobile = string.Empty;
+    private string formEmail = string.Empty;
+    private string formNationalId = string.Empty;
+    private string formEconomicCode = string.Empty;
+    private string formCity = string.Empty;
+    private string formAddress = string.Empty;
+    private string formPostalCode = string.Empty;
+    private string formNotes = string.Empty;
+    private bool formIsActive = true;
+
+    // ===== فیلترها =====
+    private string searchTerm = string.Empty;
+    private string typeFilter = string.Empty;
+    private string statusFilter = string.Empty;
+    private int pageSize = 10;
+    private int currentPage = 1;
+
+    private bool isExporting;
+
+    private List<Party> filteredParties
+    {
+        get
+        {
+            var query = parties.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                query = query.Where(p =>
+                    (p.Name ?? "").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (p.Code ?? "").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (p.Phone ?? "").Contains(term) ||
+                    (p.Mobile ?? "").Contains(term) ||
+                    (p.City ?? "").Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (p.ContactPerson ?? "").Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrEmpty(typeFilter) && Enum.TryParse<PartyType>(typeFilter, out var type))
+            {
+                query = query.Where(p => p.Type == type);
+            }
+
+            if (statusFilter == "active")
+            {
+                query = query.Where(p => p.IsActive);
+            }
+            else if (statusFilter == "inactive")
+            {
+                query = query.Where(p => !p.IsActive);
+            }
+
+            return query
+                .OrderBy(p => p.Name)
+                .ToList();
+        }
+    }
+
+    private List<Party> pagedParties => filteredParties
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+    private int totalPages => pageSize <= 0 ? 1 : (int)Math.Ceiling((double)filteredParties.Count / pageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewParties);
+        CanManage = await Access.HasAsync(user, Permissions.ManageParties);
+        CanDelete = await Access.HasAsync(user, Permissions.DeleteParties);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        parties = await Db.Parties.OrderBy(p => p.Name).ToListAsync();
+    }
+
+    private void ResetPaging() => currentPage = 1;
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        typeFilter = string.Empty;
+        statusFilter = string.Empty;
+        currentPage = 1;
+    }
+
+    private void ResetForm()
+    {
+        editing = null;
+        formCode = string.Empty;
+        formName = string.Empty;
+        formType = PartyType.Customer;
+        formContactPerson = string.Empty;
+        formPhone = string.Empty;
+        formMobile = string.Empty;
+        formEmail = string.Empty;
+        formNationalId = string.Empty;
+        formEconomicCode = string.Empty;
+        formCity = string.Empty;
+        formAddress = string.Empty;
+        formPostalCode = string.Empty;
+        formNotes = string.Empty;
+        formIsActive = true;
+    }
+
+    private void StartEdit(Party p)
+    {
+        editing = p;
+        formCode = p.Code;
+        formName = p.Name;
+        formType = p.Type;
+        formContactPerson = p.ContactPerson ?? string.Empty;
+        formPhone = p.Phone ?? string.Empty;
+        formMobile = p.Mobile ?? string.Empty;
+        formEmail = p.Email ?? string.Empty;
+        formNationalId = p.NationalId ?? string.Empty;
+        formEconomicCode = p.EconomicCode ?? string.Empty;
+        formCity = p.City ?? string.Empty;
+        formAddress = p.Address ?? string.Empty;
+        formPostalCode = p.PostalCode ?? string.Empty;
+        formNotes = p.Notes ?? string.Empty;
+        formIsActive = p.IsActive;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!CanManage)
+        {
+            Toasts.ShowError("شما اجازهٔ افزودن یا ویرایش طرف حساب را ندارید");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formCode))
+        {
+            Toasts.ShowError("کد طرف حساب را وارد کنید");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formName))
+        {
+            Toasts.ShowError("نام شخص یا شرکت را وارد کنید");
+            return;
+        }
+
+        var code = formCode.Trim();
+        var duplicate = await Db.Parties.AnyAsync(p => p.Code == code && (editing == null || p.Id != editing.Id));
+        if (duplicate)
+        {
+            Toasts.ShowError("طرف حسابی با این کد از قبل ثبت شده است");
+            return;
+        }
+
+        try
+        {
+            if (editing is null)
+            {
+                var party = new Party
+                {
+                    Code = code,
+                    Name = formName.Trim(),
+                    Type = formType,
+                    ContactPerson = NullIfEmpty(formContactPerson),
+                    Phone = NullIfEmpty(formPhone),
+                    Mobile = NullIfEmpty(formMobile),
+                    Email = NullIfEmpty(formEmail),
+                    NationalId = NullIfEmpty(formNationalId),
+                    EconomicCode = NullIfEmpty(formEconomicCode),
+                    City = NullIfEmpty(formCity),
+                    Address = NullIfEmpty(formAddress),
+                    PostalCode = NullIfEmpty(formPostalCode),
+                    Notes = NullIfEmpty(formNotes),
+                    IsActive = formIsActive
+                };
+
+                Db.Parties.Add(party);
+                await Db.SaveChangesAsync();
+
+                await AuditAsync("افزودن", "طرف حساب", party.Id, $"طرف حساب «{party.Name}» ({party.TypeTitle}) ساخته شد");
+                Toasts.ShowSuccess($"طرف حساب «{party.Name}» ساخته شد");
+            }
+            else
+            {
+                editing.Code = code;
+                editing.Name = formName.Trim();
+                editing.Type = formType;
+                editing.ContactPerson = NullIfEmpty(formContactPerson);
+                editing.Phone = NullIfEmpty(formPhone);
+                editing.Mobile = NullIfEmpty(formMobile);
+                editing.Email = NullIfEmpty(formEmail);
+                editing.NationalId = NullIfEmpty(formNationalId);
+                editing.EconomicCode = NullIfEmpty(formEconomicCode);
+                editing.City = NullIfEmpty(formCity);
+                editing.Address = NullIfEmpty(formAddress);
+                editing.PostalCode = NullIfEmpty(formPostalCode);
+                editing.Notes = NullIfEmpty(formNotes);
+                editing.IsActive = formIsActive;
+
+                Db.Parties.Update(editing);
+                await Db.SaveChangesAsync();
+
+                await AuditAsync("ویرایش", "طرف حساب", editing.Id, $"طرف حساب «{editing.Name}» ویرایش شد");
+                Toasts.ShowSuccess($"طرف حساب «{editing.Name}» ویرایش شد");
+            }
+
+            ResetForm();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteAsync(Party p)
+    {
+        if (!CanDelete)
+        {
+            Toasts.ShowError("شما اجازهٔ حذف طرف حساب را ندارید");
+            return;
+        }
+
+        try
+        {
+            Db.Parties.Remove(p);
+            await Db.SaveChangesAsync();
+
+            await AuditAsync("حذف", "طرف حساب", p.Id, $"طرف حساب «{p.Name}» حذف شد");
+            Toasts.ShowSuccess($"طرف حساب «{p.Name}» حذف شد");
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = filteredParties;
+
+            var columns = new Dictionary<string, Func<Party, object?>>
+            {
+                ["کد"] = p => p.Code,
+                ["نام"] = p => p.Name,
+                ["نوع"] = p => p.TypeTitle,
+                ["رابط"] = p => p.ContactPerson,
+                ["تلفن"] = p => p.Phone,
+                ["موبایل"] = p => p.Mobile,
+                ["ایمیل"] = p => p.Email,
+                ["کد/شناسهٔ ملی"] = p => p.NationalId,
+                ["کد اقتصادی"] = p => p.EconomicCode,
+                ["شهر"] = p => p.City,
+                ["آدرس"] = p => p.Address,
+                ["کد پستی"] = p => p.PostalCode,
+                ["وضعیت"] = p => p.IsActive ? "فعال" : "غیرفعال",
+                ["یادداشت"] = p => p.Notes
+            };
+
+            var pc = new PersianCalendar();
+            var now = DateTime.Now;
+            var title = $"مشتریان و تأمین‌کنندگان  |  تعداد: {data.Count}  |  تاریخ: {pc.GetYear(now):0000}/{pc.GetMonth(now):00}/{pc.GetDayOfMonth(now):00}";
+
+            var bytes = Excel.Export(data, "طرف حساب‌ها", columns, title);
+            var base64 = Convert.ToBase64String(bytes);
+
+            var fileName = $"Parties_{pc.GetYear(now):0000}{pc.GetMonth(now):00}{pc.GetDayOfMonth(now):00}_{now:HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64);
+            Toasts.ShowSuccess($"خروجی با {data.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        var username = AuthState is null ? null : (await AuthState).User.Identity?.Name;
+
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = username
+        });
+
+        await Db.SaveChangesAsync();
+    }
+}
