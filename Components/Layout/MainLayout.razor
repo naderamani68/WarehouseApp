@@ -26,10 +26,10 @@
                 @* ===== کاربر جاری ===== *@
                 @if (IsLoggedIn)
                 {
-                    <div class="user-box">
+                    <a class="user-box" href="/profile" title="پروفایل من">
                         <span class="user-name">@CurrentUserName</span>
                         <span class="user-role">@CurrentRoleTitle</span>
-                    </div>
+                    </a>
 
                     <a class="logout-btn" href="/account/logout" title="خروج از حساب">
                         <i class="bi bi-box-arrow-right"></i>

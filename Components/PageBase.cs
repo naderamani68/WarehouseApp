@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using WarehouseApp.Data;
 using WarehouseApp.Services;
@@ -36,6 +36,14 @@ public abstract class PageBase : ComponentBase
     protected override async Task OnInitializedAsync()
     {
         var user = AuthState is null ? null : (await AuthState).User;
+
+        // اگر رمز کاربر موقت است، اول باید آن را عوض کند
+        if (await Access.MustChangePasswordAsync(user))
+        {
+            Nav.NavigateTo("/account/change-password?forced=1", forceLoad: true);
+            return;
+        }
+
         MyPermissions = await Access.GetPermissionsAsync(user);
 
         if (!Can(Permissions.ViewData))

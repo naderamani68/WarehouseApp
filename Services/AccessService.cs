@@ -58,4 +58,37 @@ public class AccessService
         var permissions = await GetPermissionsAsync(user);
         return anyOf.Any(p => (permissions & p) == p);
     }
+
+    /// <summary>اطلاعات کارمند جاری (همراه با نقش)</summary>
+    public async Task<Employee?> GetEmployeeAsync(ClaimsPrincipal? user)
+    {
+        var id = GetEmployeeId(user);
+        if (id is null)
+        {
+            return null;
+        }
+
+        await using var db = await _factory.CreateDbContextAsync();
+
+        return await db.Employees
+            .Include(e => e.Role)
+            .FirstOrDefaultAsync(e => e.Id == id);
+    }
+
+    /// <summary>آیا کاربر باید رمز عبورش را تغییر دهد؟</summary>
+    public async Task<bool> MustChangePasswordAsync(ClaimsPrincipal? user)
+    {
+        var id = GetEmployeeId(user);
+        if (id is null)
+        {
+            return false;
+        }
+
+        await using var db = await _factory.CreateDbContextAsync();
+
+        return await db.Employees
+            .Where(e => e.Id == id && e.IsActive)
+            .Select(e => e.MustChangePassword)
+            .FirstOrDefaultAsync();
+    }
 }

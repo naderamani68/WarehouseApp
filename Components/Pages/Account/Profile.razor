@@ -1,0 +1,144 @@
+﻿@page "/profile"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@inject AccessService Access
+@inject AuthService Auth
+@inject ToastService Toasts
+
+<PageTitle>پروفایل من | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">👤 پروفایل من</h3>
+
+@* ===== میزبان پیام‌های شناور ===== *@
+<ToastHost Inline="true" />
+
+@if (employee is null)
+{
+    <div class="alert alert-warning">اطلاعات کاربری شما پیدا نشد.</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-md-7">
+            <div class="card p-3">
+                <h5 class="mb-3">مشخصات من</h5>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <th style="width: 35%;">کد پرسنلی</th>
+                            <td dir="ltr">@employee.EmployeeCode</td>
+                        </tr>
+                        <tr>
+                            <th>نام و نام خانوادگی</th>
+                            <td>@employee.FullName</td>
+                        </tr>
+                        <tr>
+                            <th>نام کاربری</th>
+                            <td dir="ltr">@employee.Username</td>
+                        </tr>
+                        <tr>
+                            <th>نقش (سمت سازمانی)</th>
+                            <td>
+                                @if (employee.Role is null)
+                                {
+                                    <span class="text-muted">— بدون نقش —</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info text-dark">@employee.Role.Name</span>
+                                }
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>سمت</th>
+                            <td>@(string.IsNullOrWhiteSpace(employee.Position) ? "—" : employee.Position)</td>
+                        </tr>
+                        <tr>
+                            <th>کد ملی</th>
+                            <td dir="ltr">@(string.IsNullOrWhiteSpace(employee.NationalId) ? "—" : employee.NationalId)</td>
+                        </tr>
+                        <tr>
+                            <th>تاریخ استخدام</th>
+                            <td dir="ltr">@(employee.HireDate.HasValue ? employee.HireDate.Value.ToString("yyyy/MM/dd") : "—")</td>
+                        </tr>
+                        <tr>
+                            <th>آخرین ورود</th>
+                            <td dir="ltr">@(employee.LastLoginAt.HasValue ? employee.LastLoginAt.Value.ToString("yyyy/MM/dd HH:mm") : "—")</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="form-text mt-2">
+                    برای تغییر نام، نقش یا کد پرسنلی، با مدیر سیستم تماس بگیرید.
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card p-3 mb-3">
+                <h5 class="mb-3">اطلاعات تماس (قابل ویرایش)</h5>
+
+                <div class="mb-3">
+                    <label class="form-label">تلفن</label>
+                    <input class="form-control" dir="ltr" @bind="phone" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">آدرس</label>
+                    <input class="form-control" @bind="address" />
+                </div>
+
+                <button type="button" class="btn btn-primary" @onclick="SaveContactAsync">ذخیره اطلاعات تماس</button>
+            </div>
+
+            <div class="card p-3">
+                <h5 class="mb-2">رمز عبور</h5>
+                <p class="text-muted small mb-2">برای تغییر رمز عبور، روی دکمهٔ زیر بزنید.</p>
+                <a href="/account/change-password" class="btn btn-outline-primary">🔑 تغییر رمز عبور</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private Employee? employee;
+    private string phone = string.Empty;
+    private string address = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        employee = await Access.GetEmployeeAsync(user);
+
+        if (employee is not null)
+        {
+            phone = employee.Phone ?? string.Empty;
+            address = employee.Address ?? string.Empty;
+        }
+    }
+
+    private async Task SaveContactAsync()
+    {
+        if (employee is null)
+        {
+            Toasts.ShowError("اطلاعات کاربری پیدا نشد");
+            return;
+        }
+
+        var result = await Auth.UpdateOwnContactAsync(employee.Id, phone, address);
+
+        if (!result.Success)
+        {
+            Toasts.ShowError(result.Error ?? "ذخیره اطلاعات تماس ناموفق بود");
+            return;
+        }
+
+        employee.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+        employee.Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+
+        Toasts.ShowSuccess("اطلاعات تماس ذخیره شد");
+    }
+}

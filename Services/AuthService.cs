@@ -145,6 +145,7 @@ public class AuthService
         }
 
         employee.PasswordHash = _hasher.HashPassword(employee, password);
+        employee.MustChangePassword = true;   // در اولین ورود، رمز را عوض کند
         _db.Employees.Add(employee);
         await _db.SaveChangesAsync();
 
@@ -172,6 +173,7 @@ public class AuthService
             }
 
             employee.PasswordHash = _hasher.HashPassword(employee, newPassword);
+            employee.MustChangePassword = true;   // کاربر باید رمز جدید را خودش تعیین کند
         }
 
         _db.Employees.Update(employee);
@@ -183,6 +185,49 @@ public class AuthService
     /// <summary>آیا رمز فقط شامل کاراکترهای قابل‌چاپ انگلیسی است؟ (بدون فاصله)</summary>
     private static bool IsLatinPassword(string password)
         => !string.IsNullOrEmpty(password) && password.All(c => c >= 33 && c <= 126);
+
+    /// <summary>تغییر رمز عبور توسط خود کاربر (با بررسی رمز فعلی)</summary>
+    public async Task<AuthResult> ChangePasswordAsync(int employeeId, string currentPassword, string newPassword)
+    {
+        var employee = await _db.Employees.FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee is null)
+        {
+            return new AuthResult { Success = false, Error = "کاربر یافت نشد" };
+        }
+
+        var check = _hasher.VerifyHashedPassword(employee, employee.PasswordHash, currentPassword);
+        if (check == PasswordVerificationResult.Failed)
+        {
+            return new AuthResult { Success = false, Error = "رمز عبور فعلی نادرست است" };
+        }
+
+        if (!IsLatinPassword(newPassword))
+        {
+            return new AuthResult { Success = false, Error = "رمز عبور باید فقط شامل حروف، عدد و نشانه‌های انگلیسی باشد" };
+        }
+
+        employee.PasswordHash = _hasher.HashPassword(employee, newPassword);
+        employee.MustChangePassword = false;
+        await _db.SaveChangesAsync();
+
+        return new AuthResult { Success = true, Employee = employee };
+    }
+
+    /// <summary>ویرایش اطلاعات تماس توسط خود کاربر</summary>
+    public async Task<AuthResult> UpdateOwnContactAsync(int employeeId, string? phone, string? address)
+    {
+        var employee = await _db.Employees.FirstOrDefaultAsync(e => e.Id == employeeId);
+        if (employee is null)
+        {
+            return new AuthResult { Success = false, Error = "کاربر یافت نشد" };
+        }
+
+        employee.Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+        employee.Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+        await _db.SaveChangesAsync();
+
+        return new AuthResult { Success = true, Employee = employee };
+    }
 
     /// <summary>هش‌کردن رمز عبور</summary>
     public string HashPassword(Employee employee, string password) => _hasher.HashPassword(employee, password);

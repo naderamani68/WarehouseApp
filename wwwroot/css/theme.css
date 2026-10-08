@@ -379,3 +379,19 @@ body {
         color: #fff;
         transform: scale(1.08);
     }
+
+/* جعبهٔ کاربر حالا یک پیوند به پروفایل است */
+a.user-box {
+    text-decoration: none;
+    transition: background 0.3s ease, transform 0.3s ease;
+}
+
+    a.user-box:hover {
+        background: var(--accent);
+        color: #fff;
+        transform: translateY(-1px);
+    }
+
+        a.user-box:hover .user-role {
+            color: rgba(255, 255, 255, 0.9);
+        }
