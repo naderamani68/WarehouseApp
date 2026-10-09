@@ -1,0 +1,170 @@
+﻿@* ورودی تاریخ شمسی — جایگزین input type="date" که تاریخ میلادی نشان می‌داد.
+   با کلیک روی دکمهٔ تقویم، ماه شمسی باز می‌شود و روزها به فارسی نشان داده می‌شوند. *@
+@using WarehouseApp.Services
+
+<div class="persian-date">
+    <div class="input-group">
+        <input class="form-control" dir="ltr" value="@Text" @onchange="OnTextChanged"
+               placeholder="1405/07/17" disabled="@Disabled" />
+        <button class="btn btn-outline-secondary" type="button" @onclick="Toggle" disabled="@Disabled" title="انتخاب از تقویم">
+            <span class="bi bi-calendar2-week" aria-hidden="true"></span>
+        </button>
+    </div>
+
+    @if (open)
+    {
+        <div class="persian-date-popup">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <button class="btn btn-sm btn-light" type="button" @onclick="() => Shift(-1)" title="ماه قبل">‹</button>
+                <div class="fw-semibold">@MonthTitle</div>
+                <button class="btn btn-sm btn-light" type="button" @onclick="() => Shift(1)" title="ماه بعد">›</button>
+            </div>
+
+            <div class="persian-date-grid">
+                @foreach (var name in WeekDayNames)
+                {
+                    <div class="persian-date-head">@name</div>
+                }
+
+                @for (var i = 0; i < LeadingBlanks; i++)
+                {
+                    <div></div>
+                }
+
+                @for (var day = 1; day <= DaysInMonth; day++)
+                {
+                    var current = day;
+                    <button type="button"
+                            class="persian-date-day @(IsSelected(current) ? "active" : "") @(IsToday(current) ? "today" : "")"
+                            @onclick="() => Pick(current)">
+                        @PersianDate.ToPersianDigits(current)
+                    </button>
+                }
+            </div>
+
+            <div class="d-flex justify-content-between mt-2">
+                <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="PickToday">امروز</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="ClearValue">پاک کردن</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly System.Globalization.PersianCalendar Pc = new();
+
+    private static readonly string[] WeekDayNames = { "ش", "ی", "د", "س", "چ", "پ", "ج" };
+
+    private static readonly string[] MonthNames =
+    {
+        "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+    };
+
+    /// <summary>تاریخ انتخاب‌شده (میلادی در حافظه، شمسی در نمایش)</summary>
+    [Parameter] public DateTime? Value { get; set; }
+
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    /// <summary>غیرفعال کردن ورودی — مثل سفارش‌های تأییدشده</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    private bool open;
+    private int viewYear;
+    private int viewMonth;
+
+    private string Text => Value.HasValue
+        ? PersianDate.ToPersianDigits(PersianDate.ToDate(Value.Value))
+        : string.Empty;
+
+    private string MonthTitle => $"{MonthNames[viewMonth - 1]} {PersianDate.ToPersianDigits(viewYear)}";
+
+    private int DaysInMonth => Pc.GetDaysInMonth(viewYear, viewMonth);
+
+    /// <summary>خانه‌های خالی اول ماه — هفته از شنبه شروع می‌شود</summary>
+    private int LeadingBlanks
+    {
+        get
+        {
+            var firstDay = Pc.ToDateTime(viewYear, viewMonth, 1, 0, 0, 0, 0);
+            return ((int)firstDay.DayOfWeek + 1) % 7;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        var basis = Value ?? DateTime.Today;
+        viewYear = Pc.GetYear(basis);
+        viewMonth = Pc.GetMonth(basis);
+    }
+
+    private void Toggle()
+    {
+        open = !open;
+
+        if (open)
+        {
+            var basis = Value ?? DateTime.Today;
+            viewYear = Pc.GetYear(basis);
+            viewMonth = Pc.GetMonth(basis);
+        }
+    }
+
+    private void Shift(int months)
+    {
+        viewMonth += months;
+
+        if (viewMonth > 12)
+        {
+            viewMonth = 1;
+            viewYear++;
+        }
+        else if (viewMonth < 1)
+        {
+            viewMonth = 12;
+            viewYear--;
+        }
+    }
+
+    private bool IsSelected(int day) =>
+        Value.HasValue
+        && Pc.GetYear(Value.Value) == viewYear
+        && Pc.GetMonth(Value.Value) == viewMonth
+        && Pc.GetDayOfMonth(Value.Value) == day;
+
+    private bool IsToday(int day)
+    {
+        var today = DateTime.Today;
+        return Pc.GetYear(today) == viewYear && Pc.GetMonth(today) == viewMonth && Pc.GetDayOfMonth(today) == day;
+    }
+
+    private async Task Pick(int day)
+    {
+        Value = Pc.ToDateTime(viewYear, viewMonth, day, 0, 0, 0, 0);
+        open = false;
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task PickToday()
+    {
+        var today = DateTime.Today;
+        viewYear = Pc.GetYear(today);
+        viewMonth = Pc.GetMonth(today);
+        Value = today;
+        open = false;
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task ClearValue()
+    {
+        Value = null;
+        open = false;
+        await ValueChanged.InvokeAsync(null);
+    }
+
+    private async Task OnTextChanged(ChangeEventArgs e)
+    {
+        Value = PersianDate.Parse(e.Value?.ToString());
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

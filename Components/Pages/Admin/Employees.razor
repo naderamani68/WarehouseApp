@@ -60,7 +60,7 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">تاریخ استخدام</label>
-                <input type="date" class="form-control" @bind="formHireDate" />
+                <PersianDateInput @bind-Value="formHireDate" />
             </div>
 
             <div class="col-md-6">
@@ -159,7 +159,7 @@ else
                             }
                         </td>
                         <td class="text-muted small">
-                            @(e.LastLoginAt.HasValue ? e.LastLoginAt.Value.ToString("yyyy/MM/dd HH:mm") : "— هرگز —")
+                            @(e.LastLoginAt.HasValue ? WarehouseApp.Services.PersianDate.ToDateTime(e.LastLoginAt.Value) : "— هرگز —")
                         </td>
                         <td>
                             <button type="button" class="btn btn-sm btn-warning" @onclick="() => StartEdit(e)">ویرایش</button>

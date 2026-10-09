@@ -61,11 +61,11 @@ else
                         </tr>
                         <tr>
                             <th>تاریخ استخدام</th>
-                            <td dir="ltr">@(employee.HireDate.HasValue ? employee.HireDate.Value.ToString("yyyy/MM/dd") : "—")</td>
+                            <td dir="ltr">@(WarehouseApp.Services.PersianDate.OrDash(employee.HireDate))</td>
                         </tr>
                         <tr>
                             <th>آخرین ورود</th>
-                            <td dir="ltr">@(employee.LastLoginAt.HasValue ? employee.LastLoginAt.Value.ToString("yyyy/MM/dd HH:mm") : "—")</td>
+                            <td dir="ltr">@(WarehouseApp.Services.PersianDate.DateTimeOrDash(employee.LastLoginAt))</td>
                         </tr>
                     </tbody>
                 </table>

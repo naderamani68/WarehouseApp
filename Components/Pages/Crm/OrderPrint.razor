@@ -65,6 +65,10 @@
                         <div class="fw-bold">فاکتور فروش</div>
                         <div dir="ltr">@order.OrderNumber</div>
                         <div class="small" dir="ltr">@PersianDate.ToDate(order.OrderDate)</div>
+                        @if (order.CreatedAt.Year > 2000)
+                        {
+                            <div class="small text-muted">ساعت ثبت: @PersianDate.ToPersianDigits(order.CreatedAt.ToString("HH:mm"))</div>
+                        }
                         <div class="small">وضعیت: @order.StatusTitle</div>
                     </div>
                 </div>

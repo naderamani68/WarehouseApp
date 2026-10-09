@@ -99,11 +99,11 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">تاریخ صدور</label>
-                <input type="date" class="form-control" @bind="formIssueDate" />
+                <PersianDateInput Value="formIssueDate" ValueChanged="v => formIssueDate = v ?? DateTime.Today" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">تاریخ سررسید</label>
-                <input type="date" class="form-control" @bind="formDueDate" />
+                <PersianDateInput Value="formDueDate" ValueChanged="v => formDueDate = v ?? DateTime.Today" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">وضعیت</label>

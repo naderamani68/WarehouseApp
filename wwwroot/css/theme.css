@@ -1275,3 +1275,57 @@ a.user-box:hover {
     padding: 0.2rem 0.55rem;
     font-size: 0.75rem;
 }
+
+/* ===== ورودی تاریخ شمسی ===== */
+.persian-date {
+    position: relative;
+}
+
+.persian-date-popup {
+    position: absolute;
+    z-index: 1050;
+    top: calc(100% + 4px);
+    inset-inline-start: 0;
+    min-width: 270px;
+    padding: 10px;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+}
+
+.persian-date-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.persian-date-head {
+    padding: 2px 0;
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text-muted, #6b7280);
+}
+
+.persian-date-day {
+    padding: 6px 0;
+    font-size: 0.85rem;
+    color: var(--text-main, #1f2937);
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.persian-date-day:hover {
+    background: var(--bg-body, #f1f5f9);
+}
+
+.persian-date-day.today {
+    outline: 1px solid var(--accent, #4f46e5);
+}
+
+.persian-date-day.active {
+    color: #fff;
+    background: var(--accent, #4f46e5);
+}

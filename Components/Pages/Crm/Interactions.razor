@@ -64,11 +64,11 @@ else
 
             <div class="col-md-3">
                 <label class="form-label">زمان تعامل</label>
-                <input type="date" class="form-control" @bind="formAt" />
+                <PersianDateInput Value="formAt" ValueChanged="v => formAt = v ?? DateTime.Today" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">سررسید پیگیری بعدی (اختیاری)</label>
-                <input type="date" class="form-control" @bind="formFollowUp" />
+                <PersianDateInput @bind-Value="formFollowUp" />
             </div>
             <div class="col-md-6">
                 <label class="form-label">شرح گفتگو یا نتیجه</label>

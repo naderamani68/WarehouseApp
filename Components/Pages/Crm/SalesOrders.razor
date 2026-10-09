@@ -70,7 +70,7 @@ else
             </div>
             <div class="col-md-2">
                 <label class="form-label">تاریخ سفارش</label>
-                <input type="date" class="form-control" @bind="formDate" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)" />
+                <PersianDateInput Value="formDate" ValueChanged="v => formDate = v ?? DateTime.Today" Disabled="@(editing is not null && editing.Status != OrderStatus.Draft)" />
             </div>
             <div class="col-md-2">
                 <label class="form-label">شمارهٔ سفارش</label>
