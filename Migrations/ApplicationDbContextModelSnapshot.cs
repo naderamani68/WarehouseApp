@@ -840,6 +840,100 @@ namespace WarehouseApp.Migrations
                         });
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.SalesChannel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Hint")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SalesChannels");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "فروش رودررو به مشتری",
+                            IsActive = true,
+                            Name = "حضوری",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "سفارش تلفنی",
+                            IsActive = true,
+                            Name = "تلفنی",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "آگهی در دیوار",
+                            IsActive = true,
+                            Name = "دیوار",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "دایرکت یا صفحهٔ اینستاگرام",
+                            IsActive = true,
+                            Name = "اینستاگرام",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "فروش در دیجی‌کالا",
+                            IsActive = true,
+                            Name = "دیجی‌کالا",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "سفارش از سایت خودمان",
+                            IsActive = true,
+                            Name = "فروشگاه اینترنتی",
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Hint = "هر جای دیگر",
+                            IsActive = true,
+                            Name = "سایر",
+                            SortOrder = 7
+                        });
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.SalesOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -850,6 +944,9 @@ namespace WarehouseApp.Migrations
 
                     b.Property<string>("CancelReason")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ChannelId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("datetime2");
@@ -883,6 +980,8 @@ namespace WarehouseApp.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ChannelId");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique();
@@ -1110,6 +1209,10 @@ namespace WarehouseApp.Migrations
 
             modelBuilder.Entity("WarehouseApp.Data.SalesOrder", b =>
                 {
+                    b.HasOne("WarehouseApp.Data.SalesChannel", "Channel")
+                        .WithMany()
+                        .HasForeignKey("ChannelId");
+
                     b.HasOne("WarehouseApp.Data.Party", "Party")
                         .WithMany()
                         .HasForeignKey("PartyId")
@@ -1120,6 +1223,8 @@ namespace WarehouseApp.Migrations
                         .WithMany()
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Channel");
 
                     b.Navigation("Party");
 

@@ -38,7 +38,7 @@ else
         }
 
         <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">طرف حساب (مشتری)</label>
                 <select class="form-select" @bind="formPartyId" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)">
                     <option value="0">— انتخاب کنید —</option>
@@ -48,13 +48,23 @@ else
                     }
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">انبار خروج</label>
                 <select class="form-select" @bind="formWarehouseId" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)">
                     <option value="0">— انتخاب کنید —</option>
                     @foreach (var w in warehouses)
                     {
                         <option value="@w.Id">@w.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">کانال فروش</label>
+                <select class="form-select" @bind="formChannelId" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)">
+                    <option value="0">— نامشخص —</option>
+                    @foreach (var c in channels)
+                    {
+                        <option value="@c.Id">@c.Name</option>
                     }
                 </select>
             </div>
@@ -132,6 +142,9 @@ else
                 <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
                     @(editing is null ? "ثبت سفارش (پیش‌نویس)" : "ذخیره تغییرات")
                 </button>
+                <button class="btn btn-success" @onclick="SaveAndConfirmAsync" disabled="@busy">
+                    <i class="bi bi-lightning-charge"></i> ثبت و کسر فوری از انبار
+                </button>
             }
 
             @if (editing is not null && editing.Status == OrderStatus.Draft && CanConfirm)
@@ -150,11 +163,11 @@ else
 
     <div class="card p-3 mb-3">
         <div class="row g-2 align-items-end">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">جستجو</label>
                 <input class="form-control" @bind="search" @bind:after="LoadAsync" placeholder="شمارهٔ سفارش، نام مشتری یا یادداشت..." />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">وضعیت</label>
                 <select class="form-select" @bind="filterStatus" @bind:after="LoadAsync">
                     <option value="0">— همه —</option>
@@ -163,13 +176,23 @@ else
                     <option value="@OrderStatus.Canceled">لغو‌شده</option>
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">طرف حساب</label>
                 <select class="form-select" @bind="filterPartyId" @bind:after="LoadAsync">
                     <option value="0">— همه —</option>
                     @foreach (var p in customers)
                     {
                         <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">کانال فروش</label>
+                <select class="form-select" @bind="filterChannelId" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    @foreach (var c in channels)
+                    {
+                        <option value="@c.Id">@c.Name</option>
                     }
                 </select>
             </div>
@@ -191,6 +214,17 @@ else
         <div class="text-muted small mt-2">
             @orders.Count.ToString("N0", Fa) سفارش — جمع مبلغ سفارش‌های نمایش‌داده‌شده: @Money(orders.Sum(o => o.Total))
         </div>
+
+        @if (orders.Any(o => o.Channel is not null))
+        {
+            <div class="mt-2">
+                <span class="text-muted small me-1">فروش به تفکیک کانال:</span>
+                @foreach (var group in orders.Where(o => o.Channel is not null).GroupBy(o => o.Channel!.Name).OrderByDescending(g => g.Count()))
+                {
+                    <span class="badge bg-light text-dark border me-1">@group.Key: @group.Count().ToString("N0", Fa)</span>
+                }
+            </div>
+        }
     </div>
 
     <div class="card p-0">
@@ -202,6 +236,7 @@ else
                         <th>شماره</th>
                         <th>مشتری</th>
                         <th>انبار</th>
+                        <th>کانال فروش</th>
                         <th>تاریخ</th>
                         <th>اقلام</th>
                         <th>مبلغ کل</th>
@@ -214,7 +249,7 @@ else
                     @if (orders.Count == 0)
                     {
                         <tr>
-                            <td colspan="10" class="text-center text-muted py-4">سفارشی برای نمایش نیست.</td>
+                            <td colspan="11" class="text-center text-muted py-4">سفارشی برای نمایش نیست.</td>
                         </tr>
                     }
                     @foreach (var order in orders)
@@ -234,6 +269,16 @@ else
                             </td>
                             <td><a href="@($"crm/parties/{order.PartyId}")">@(order.Party?.Name ?? "—")</a></td>
                             <td class="small">@(order.Warehouse?.Name ?? "—")</td>
+                            <td class="small">
+                                @if (order.Channel is not null)
+                                {
+                                    <span class="badge bg-light text-dark border">@order.Channel.Name</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
                             <td class="small" dir="ltr">@PersianDate.ToDate(order.OrderDate)</td>
                             <td class="small">@order.Items.Count.ToString("N0", Fa) قلم / @order.TotalQuantity.ToString("N0", Fa) عدد</td>
                             <td class="fw-bold">@Money(order.Total)</td>
@@ -246,6 +291,9 @@ else
                             </td>
                             <td class="small text-muted">@(order.Username ?? "—")</td>
                             <td>
+                                <a class="btn btn-sm btn-outline-secondary me-1" href="@($"crm/orders/{order.Id}/print")" title="فاکتور چاپی">
+                                    <i class="bi bi-printer"></i>
+                                </a>
                                 @if (order.Status == OrderStatus.Draft && CanManage)
                                 {
                                     <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(order)">ویرایش</button>
@@ -327,15 +375,18 @@ else
     private List<Warehouse> warehouses = new();
     private List<Product> products = new();
     private List<SalesOrder> orders = new();
+    private List<SalesChannel> channels = new();
     private SalesOrder? editing;
     private readonly HashSet<int> expanded = new();
 
     private string search = string.Empty;
     private int filterStatus;
     private int filterPartyId;
+    private int filterChannelId;
 
     private int formPartyId;
     private int formWarehouseId;
+    private int formChannelId;
     private DateTime formDate = DateTime.Today;
     private string? formNotes;
     private string nextNumber = string.Empty;
@@ -368,6 +419,7 @@ else
 
         warehouses = await Db.Warehouses.OrderBy(w => w.Name).ToListAsync();
         products = await Db.Products.OrderBy(p => p.Name).ToListAsync();
+        channels = await Db.SalesChannels.Where(c => c.IsActive).OrderBy(c => c.SortOrder).ToListAsync();
         nextNumber = await CrmService.NextOrderNumberAsync(Db);
 
         AddLine();
@@ -379,6 +431,7 @@ else
         var query = Db.SalesOrders
             .Include(o => o.Party)
             .Include(o => o.Warehouse)
+            .Include(o => o.Channel)
             .Include(o => o.Items).ThenInclude(i => i.Product)
             .AsQueryable();
 
@@ -399,6 +452,11 @@ else
         if (filterPartyId > 0)
         {
             query = query.Where(o => o.PartyId == filterPartyId);
+        }
+
+        if (filterChannelId > 0)
+        {
+            query = query.Where(o => o.ChannelId == filterChannelId);
         }
 
         orders = await query
@@ -443,7 +501,12 @@ else
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveAsync() => await SaveCoreAsync(false);
+
+    /// <summary>ثبت و بی‌درنگ کسر از انبار — برای فروش حضوری و تلفنی سریع</summary>
+    private async Task SaveAndConfirmAsync() => await SaveCoreAsync(true);
+
+    private async Task SaveCoreAsync(bool confirmAfter)
     {
         if (formPartyId <= 0)
         {
@@ -496,6 +559,7 @@ else
             order.WarehouseId = formWarehouseId > 0 ? formWarehouseId : null;
             order.OrderDate = formDate.Date;
             order.Notes = NullIfEmpty(formNotes);
+            order.ChannelId = formChannelId > 0 ? formChannelId : null;
 
             foreach (var line in valid)
             {
@@ -518,6 +582,18 @@ else
             Toasts.ShowSuccess($"سفارش «{order.OrderNumber}» ذخیره شد");
             await ResetFormAsync();
             await LoadAsync();
+
+            if (confirmAfter && order.Status == OrderStatus.Draft)
+            {
+                if (CanConfirm)
+                {
+                    await ConfirmOrderAsync(order);
+                }
+                else
+                {
+                    Toasts.ShowError("سفارش ذخیره شد، ولی شما اجازهٔ تأیید سفارش را ندارید");
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -534,6 +610,7 @@ else
         editing = order;
         formPartyId = order.PartyId;
         formWarehouseId = order.WarehouseId ?? 0;
+        formChannelId = order.ChannelId ?? 0;
         formDate = order.OrderDate;
         formNotes = order.Notes;
 
@@ -558,6 +635,7 @@ else
         editing = null;
         formPartyId = 0;
         formWarehouseId = 0;
+        formChannelId = 0;
         formDate = DateTime.Today;
         formNotes = null;
         lines = new List<LineDraft>();

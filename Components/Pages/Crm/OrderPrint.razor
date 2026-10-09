@@ -1,0 +1,255 @@
+﻿@page "/crm/orders/{Id:int}/print"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@using WarehouseApp.Data
+@using WarehouseApp.Services
+@inject ApplicationDbContext Db
+@inject IJSRuntime JS
+
+@* نسخهٔ چاپی سفارش فروش — سرصفحه از اطلاعات شرکت در تنظیمات خوانده می‌شود *@
+
+<PageTitle>فاکتور @(order?.OrderNumber ?? "")</PageTitle>
+
+<div class="container-fluid">
+
+    @if (order is null)
+    {
+        <div class="alert alert-warning">این سفارش پیدا نشد.</div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 no-print">
+            <a class="btn btn-outline-secondary" href="/crm/orders">
+                <span class="bi bi-arrow-right me-1" aria-hidden="true"></span>
+                بازگشت به سفارش‌ها
+            </a>
+
+            <button class="btn btn-primary" @onclick="PrintAsync">
+                <span class="bi bi-printer me-1" aria-hidden="true"></span>
+                چاپ فاکتور
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body" style="max-width:900px;margin:0 auto">
+
+                @* ===== سرصفحه ===== *@
+                <div class="d-flex flex-wrap justify-content-between align-items-start border-bottom pb-3 mb-3">
+                    <div>
+                        <div class="fs-4 fw-bold">@Company("Company.Name", "نام شرکت را در تنظیمات وارد کن")</div>
+
+                        @if (Company("Company.Address").Length > 0)
+                        {
+                            <div class="small text-muted">@Company("Company.Address")</div>
+                        }
+
+                        <div class="small text-muted">
+                            @if (Company("Company.Phone").Length > 0)
+                            {
+                                <span class="me-3">تلفن: @Company("Company.Phone")</span>
+                            }
+                            @if (Company("Company.EconomicCode").Length > 0)
+                            {
+                                <span class="me-3">کد اقتصادی: @Company("Company.EconomicCode")</span>
+                            }
+                            @if (Company("Company.NationalId").Length > 0)
+                            {
+                                <span>شناسهٔ ملی: @Company("Company.NationalId")</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        <div class="fw-bold">فاکتور فروش</div>
+                        <div dir="ltr">@order.OrderNumber</div>
+                        <div class="small" dir="ltr">@PersianDate.ToDate(order.OrderDate)</div>
+                        <div class="small">وضعیت: @order.StatusTitle</div>
+                    </div>
+                </div>
+
+                @* ===== اطلاعات خریدار ===== *@
+                <div class="row g-3 mb-3">
+                    <div class="col-md-7">
+                        <div class="border rounded p-2 h-100">
+                            <div class="text-muted small mb-1">خریدار</div>
+                            <div class="fw-semibold">@(order.Party?.Name ?? "—")</div>
+
+                            @if (!string.IsNullOrWhiteSpace(order.Party?.Mobile) || !string.IsNullOrWhiteSpace(order.Party?.Phone))
+                            {
+                                <div class="small" dir="ltr">@(order.Party?.Mobile ?? order.Party?.Phone)</div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(order.Party?.Address))
+                            {
+                                <div class="small text-muted">@order.Party?.Address</div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <div class="border rounded p-2 h-100">
+                            <div class="text-muted small mb-1">انبار و ثبت‌کننده</div>
+                            <div>انبار: @(order.Warehouse?.Name ?? "—")</div>
+                            <div class="small text-muted">ثبت‌کننده: @(order.Username ?? "—")</div>
+                        </div>
+                    </div>
+                </div>
+
+                @* ===== اقلام ===== *@
+                <table class="table table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:40px">#</th>
+                            <th>کالا</th>
+                            <th class="text-center" style="width:90px">تعداد</th>
+                            <th class="text-end" style="width:130px">قیمت واحد</th>
+                            <th class="text-center" style="width:80px">تخفیف</th>
+                            <th class="text-end" style="width:140px">جمع</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var rowNumber = 1;
+                        }
+                        @foreach (var item in order.Items)
+                        {
+                            <tr>
+                                <td>@rowNumber.ToString("N0", Fa)</td>
+                                <td>
+                                    @(item.Product?.Name ?? "—")
+                                    @if (item.Product is not null)
+                                    {
+                                        <span class="text-muted small">(@item.Product.UnitTitle)</span>
+                                    }
+                                </td>
+                                <td class="text-center">@item.Quantity.ToString("N0", Fa)</td>
+                                <td class="text-end">@Money(item.UnitPrice)</td>
+                                <td class="text-center">@item.DiscountPercent.ToString("N0", Fa)٪</td>
+                                <td class="text-end">@Money(item.LineTotal)</td>
+                            </tr>
+                            rowNumber++;
+                        }
+                    </tbody>
+                </table>
+
+                @* ===== جمع‌ها ===== *@
+                <div class="d-flex justify-content-end">
+                    <table class="table table-sm" style="max-width:340px">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted">جمع کالاها</td>
+                                <td class="text-end fw-semibold">@Money(SubTotal)</td>
+                            </tr>
+                            @if (TotalDiscount > 0)
+                            {
+                                <tr>
+                                    <td class="text-muted">تخفیف</td>
+                                    <td class="text-end">@Money(TotalDiscount)</td>
+                                </tr>
+                            }
+                            @if (VatAmount > 0)
+                            {
+                                <tr>
+                                    <td class="text-muted">مالیات بر ارزش افزوده (@vatPercent.ToString("N0", Fa)٪)</td>
+                                    <td class="text-end">@Money(VatAmount)</td>
+                                </tr>
+                            }
+                            <tr class="border-top">
+                                <td class="fw-bold">قابل پرداخت</td>
+                                <td class="text-end fw-bold">@Money(Payable) ریال</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(order.Notes))
+                {
+                    <div class="border rounded p-2 mb-3">
+                        <div class="text-muted small mb-1">یادداشت</div>
+                        <div style="white-space:pre-line">@order.Notes</div>
+                    </div>
+                }
+
+                @* ===== امضا ===== *@
+                <div class="row g-3 mt-4 pt-3 border-top">
+                    <div class="col-6 text-center small text-muted">مهر و امضای فروشنده</div>
+                    <div class="col-6 text-center small text-muted">امضای خریدار</div>
+                </div>
+
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    private static readonly string[] CompanyKeys =
+    {
+        "Company.Name",
+        "Company.Phone",
+        "Company.Address",
+        "Company.EconomicCode",
+        "Company.NationalId",
+        "Tax.VatPercent",
+        "Tax.VatEnabled"
+    };
+
+    [Parameter] public int Id { get; set; }
+
+    private SalesOrder? order;
+    private Dictionary<string, string> settings = new();
+    private bool vatEnabled;
+    private decimal vatPercent;
+
+    private decimal SubTotal => order?.Items.Sum(i => i.LineTotal) ?? 0;
+
+    private decimal TotalDiscount => order?.Items.Sum(i => (i.UnitPrice * i.Quantity) - i.LineTotal) ?? 0;
+
+    private decimal VatAmount => vatEnabled ? Math.Round(SubTotal * vatPercent / 100m) : 0;
+
+    private decimal Payable => SubTotal + VatAmount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        order = await Db.SalesOrders
+            .AsNoTracking()
+            .Include(o => o.Party)
+            .Include(o => o.Warehouse)
+            .Include(o => o.Items).ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(o => o.Id == Id);
+
+        if (order is null)
+        {
+            return;
+        }
+
+        var rows = await Db.AppSettings
+            .AsNoTracking()
+            .Where(s => CompanyKeys.Contains(s.Key))
+            .ToListAsync();
+
+        settings = rows.ToDictionary(r => r.Key, r => r.Value ?? string.Empty);
+
+        vatEnabled = settings.TryGetValue("Tax.VatEnabled", out var enabled)
+                     && enabled.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+        vatPercent = decimal.TryParse(
+            settings.GetValueOrDefault("Tax.VatPercent"),
+            NumberStyles.Any,
+            CultureInfo.InvariantCulture,
+            out var percent)
+            ? percent
+            : 0;
+    }
+
+    private string Company(string key, string fallback = "") =>
+        settings.TryGetValue(key, out var value) && value.Length > 0 ? value : fallback;
+
+    private static string Money(decimal value) => value.ToString("N0", Fa);
+
+    private async Task PrintAsync() => await JS.InvokeVoidAsync("print");
+}

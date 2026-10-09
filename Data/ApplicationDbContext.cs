@@ -24,6 +24,7 @@ namespace WarehouseApp.Data
         public DbSet<SalesOrder> SalesOrders { get; set; }           // سفارش‌های فروش
         public DbSet<SalesOrderItem> SalesOrderItems { get; set; }   // اقلام سفارش
         public DbSet<ProductImage> ProductImages { get; set; }       // گالری عکس کالا
+        public DbSet<SalesChannel> SalesChannels { get; set; }       // کانال‌های فروش
 
         // ===== بخش مالی =====
         public DbSet<Cheque> Cheques { get; set; }     // چک و سفته
@@ -190,6 +191,16 @@ namespace WarehouseApp.Data
                 new AppSetting { Key = "Sms.ApiUrl", Value = "", Title = "نشانی پنل پیامک", Group = "پیامک", ValueType = "text", SortOrder = 2, Hint = "جانگهدارها: {apiKey} و {sender} و {receptor} و {message}", UpdatedAt = seedDate },
                 new AppSetting { Key = "Sms.ApiKey", Value = "", Title = "کلید پنل پیامک", Group = "پیامک", ValueType = "text", SortOrder = 3, UpdatedAt = seedDate },
                 new AppSetting { Key = "Sms.Sender", Value = "", Title = "شمارهٔ فرستنده", Group = "پیامک", ValueType = "text", SortOrder = 4, UpdatedAt = seedDate });
+
+            // ===== کانال‌های فروش =====
+            modelBuilder.Entity<SalesChannel>().HasData(
+                new SalesChannel { Id = 1, Name = "حضوری", Hint = "فروش رودررو به مشتری", SortOrder = 1, CreatedAt = seedDate },
+                new SalesChannel { Id = 2, Name = "تلفنی", Hint = "سفارش تلفنی", SortOrder = 2, CreatedAt = seedDate },
+                new SalesChannel { Id = 3, Name = "دیوار", Hint = "آگهی در دیوار", SortOrder = 3, CreatedAt = seedDate },
+                new SalesChannel { Id = 4, Name = "اینستاگرام", Hint = "دایرکت یا صفحهٔ اینستاگرام", SortOrder = 4, CreatedAt = seedDate },
+                new SalesChannel { Id = 5, Name = "دیجی‌کالا", Hint = "فروش در دیجی‌کالا", SortOrder = 5, CreatedAt = seedDate },
+                new SalesChannel { Id = 6, Name = "فروشگاه اینترنتی", Hint = "سفارش از سایت خودمان", SortOrder = 6, CreatedAt = seedDate },
+                new SalesChannel { Id = 7, Name = "سایر", Hint = "هر جای دیگر", SortOrder = 7, CreatedAt = seedDate });
 
             // ===== نقش‌های پیش‌فرض =====
             modelBuilder.Entity<Role>().HasData(

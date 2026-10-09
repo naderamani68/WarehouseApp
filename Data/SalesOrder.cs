@@ -47,6 +47,11 @@ public class SalesOrder
     /// <summary>منبع ثبت سفارش (پنل، فروشگاه یا فروشنده)</summary>
     public OrderSource Source { get; set; } = OrderSource.Panel;
 
+    /// <summary>کانال فروش — کالا کجا فروخته شد (حضوری، دیوار، اینستاگرام…)</summary>
+    public int? ChannelId { get; set; }
+
+    public SalesChannel? Channel { get; set; }
+
     public int PartyId { get; set; }
     public Party? Party { get; set; }
 

@@ -136,6 +136,7 @@ public class ShopCatalogService
         var order = await db.SalesOrders
             .AsNoTracking()
             .Include(o => o.Party)
+            .Include(o => o.Channel)
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.OrderNumber == number.Trim());
 
@@ -163,7 +164,8 @@ public class ShopCatalogService
             order.StatusBadge,
             order.TotalQuantity,
             order.Total,
-            order.Party?.Name);
+            order.Party?.Name,
+            order.Channel != null ? order.Channel.Name : null);
     }
 
     /// <summary>یکسان‌سازی شمارهٔ تلفن: رقم فارسی به لاتین، حذف نویسه‌های اضافه، ده رقم آخر</summary>
@@ -284,4 +286,5 @@ public record ShopOrderDto(
     string StatusBadge,
     int ItemCount,
     decimal Total,
-    string? CustomerName);
+    string? CustomerName,
+    string? ChannelName);

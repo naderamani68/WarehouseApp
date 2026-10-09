@@ -148,6 +148,11 @@ public static class ShopEndpoints
                 .Select(w => (int?)w.Id)
                 .FirstOrDefaultAsync();
 
+            var shopChannelId = await db.SalesChannels
+                .Where(c => c.Name == "فروشگاه اینترنتی")
+                .Select(c => (int?)c.Id)
+                .FirstOrDefaultAsync();
+
             var order = new SalesOrder
             {
                 OrderNumber = "TEMP",
@@ -157,6 +162,7 @@ public static class ShopEndpoints
                 CreatedAt = DateTime.Now,
                 Status = OrderStatus.Draft,
                 Source = OrderSource.Shop,
+                ChannelId = shopChannelId,
                 Username = "shop",
                 Notes = BuildNotes(customerAddress, customerNote)
             };
