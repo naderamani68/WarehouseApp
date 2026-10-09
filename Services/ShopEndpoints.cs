@@ -84,6 +84,8 @@ public static class ShopEndpoints
         app.MapPost("/shop/cart/checkout", async (
             HttpContext context,
             ApplicationDbContext db,
+            IConfiguration configuration,
+            SmsService sms,
             [FromForm] string? name,
             [FromForm] string? phone,
             [FromForm] string? address,
@@ -194,9 +196,63 @@ public static class ShopEndpoints
             order.OrderNumber = $"SO-{order.Id:00000}";
             await db.SaveChangesAsync();
 
+            // ===== پیامک تأیید برای مشتری =====
+            var baseUrl = (configuration["Shop:BaseUrl"] ?? "http://localhost:5023").TrimEnd('/');
+            var total = order.Items.Sum(i => i.Quantity * i.UnitPrice);
+
+            await sms.SendAsync(
+                customerPhone,
+                $"سفارش شما با شماره {order.OrderNumber} ثبت شد. مبلغ {total:N0} ریال. پیگیری: {baseUrl}/shop/order/{order.OrderNumber}");
+
             ShopCart.Clear(context);
 
             return Results.Redirect($"/shop/order/{order.OrderNumber}");
+        });
+
+        // ===== راهنمای ربات‌های جستجو =====
+        app.MapGet("/robots.txt", (IConfiguration configuration) =>
+        {
+            var baseUrl = (configuration["Shop:BaseUrl"] ?? "http://localhost:5023").TrimEnd('/');
+
+            var text = "User-agent: *\n" +
+                       "Allow: /shop\n" +
+                       "Disallow: /account/\n" +
+                       "Disallow: /admin/\n" +
+                       "Disallow: /crm/\n" +
+                       "Disallow: /finance/\n" +
+                       "Disallow: /warehouse/\n" +
+                       "Disallow: /sales/\n" +
+                       "Disallow: /settings\n" +
+                       $"Sitemap: {baseUrl}/sitemap.xml\n";
+
+            return Results.Text(text, "text/plain");
+        });
+
+        // ===== نقشهٔ سایت برای موتور جستجو =====
+        app.MapGet("/sitemap.xml", async (IConfiguration configuration, ApplicationDbContext db) =>
+        {
+            var baseUrl = (configuration["Shop:BaseUrl"] ?? "http://localhost:5023").TrimEnd('/');
+
+            var ids = await db.Products
+                .AsNoTracking()
+                .Where(p => p.IsActive && p.ShowInShop)
+                .OrderBy(p => p.Id)
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            var builder = new System.Text.StringBuilder();
+            builder.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+            builder.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+            builder.AppendLine($"  <url><loc>{baseUrl}/shop</loc></url>");
+
+            foreach (var id in ids)
+            {
+                builder.AppendLine($"  <url><loc>{baseUrl}/shop/product/{id}</loc></url>");
+            }
+
+            builder.AppendLine("</urlset>");
+
+            return Results.Text(builder.ToString(), "application/xml", System.Text.Encoding.UTF8);
         });
     }
 

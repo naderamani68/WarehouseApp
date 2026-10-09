@@ -681,6 +681,9 @@ namespace WarehouseApp.Migrations
                     b.Property<decimal>("SalePrice")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<bool>("ShowInShop")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Unit")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -695,6 +698,34 @@ namespace WarehouseApp.Migrations
                         .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("WarehouseApp.Data.ProductImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductImages");
                 });
 
             modelBuilder.Entity("WarehouseApp.Data.Role", b =>
@@ -853,6 +884,37 @@ namespace WarehouseApp.Migrations
                     b.ToTable("SalesOrderItems");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.SmsMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProviderResponse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SmsMessages");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.StockMovement", b =>
                 {
                     b.Property<int>("Id")
@@ -991,6 +1053,17 @@ namespace WarehouseApp.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("WarehouseApp.Data.ProductImage", b =>
+                {
+                    b.HasOne("WarehouseApp.Data.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("WarehouseApp.Data.SalesOrder", b =>

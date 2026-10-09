@@ -23,6 +23,7 @@ namespace WarehouseApp.Data
         public DbSet<CrmOpportunity> CrmOpportunities { get; set; }  // فرصت‌های فروش
         public DbSet<SalesOrder> SalesOrders { get; set; }           // سفارش‌های فروش
         public DbSet<SalesOrderItem> SalesOrderItems { get; set; }   // اقلام سفارش
+        public DbSet<ProductImage> ProductImages { get; set; }       // گالری عکس کالا
 
         // ===== بخش مالی =====
         public DbSet<Cheque> Cheques { get; set; }     // چک و سفته
@@ -31,6 +32,7 @@ namespace WarehouseApp.Data
 
         // ===== تنظیمات =====
         public DbSet<AppSetting> AppSettings { get; set; }   // تنظیمات قابل ویرایش (نرخ مالیات، اطلاعات شرکت)
+        public DbSet<SmsMessage> SmsMessages { get; set; }   // پیامک‌های ارسالی
 
         // 👇 متد جدید برای تنظیم رفتار حذف دسته
         protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -38,6 +38,9 @@ public class Product
     /// <summary>مسیر نسبی عکس کالا در پوشهٔ wwwroot — برای نمایش در فروشگاه</summary>
     public string? ImagePath { get; set; }
 
+    /// <summary>نمایش این کالا در فروشگاه اینترنتی</summary>
+    public bool ShowInShop { get; set; } = true;
+
     [MaxLength(500)]
     public string? Description { get; set; }
 

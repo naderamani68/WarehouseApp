@@ -147,6 +147,10 @@
                             {
                                 <span class="badge bg-secondary">غیرفعال</span>
                             }
+                            @if (!product.ShowInShop)
+                            {
+                                <span class="badge bg-secondary">پنهان از فروشگاه</span>
+                            }
                             @if (!string.IsNullOrWhiteSpace(product.Barcode))
                             {
                                 <div class="text-muted small" dir="ltr">@product.Barcode</div>
@@ -195,6 +199,10 @@
                                 <span class="bi bi-image" aria-hidden="true"></span>
                             </label>
                             <InputFile id="@("img_" + product.Id)" OnChange="e => UploadImage(e, product)" accept="image/*" class="d-none" />
+                            <label for="@("gal_" + product.Id)" class="btn btn-sm btn-outline-secondary mb-0 mt-1" title="انتخاب چند عکس (گالری)">
+                                <span class="bi bi-images" aria-hidden="true"></span>
+                            </label>
+                            <InputFile id="@("gal_" + product.Id)" OnChange="e => UploadGallery(e, product)" accept="image/*" multiple class="d-none" />
                         </td>
                         <td>
                             <span class="badge @product.StockBadge">@product.StockStatus</span>
@@ -202,6 +210,11 @@
                         <td>
                             @if (Can(Permissions.ManageProducts))
                             {
+                                <button class="btn btn-sm @(product.ShowInShop ? "btn-outline-info" : "btn-outline-secondary") me-1"
+                                        @onclick="() => ToggleShopVisibility(product)"
+                                        title="@(product.ShowInShop ? "پنهان کردن از فروشگاه" : "نمایش در فروشگاه")">
+                                    <span class="bi @(product.ShowInShop ? "bi-eye" : "bi-eye-slash")" aria-hidden="true"></span>
+                                </button>
                                 <button class="btn btn-sm btn-warning me-1" @onclick="() => StartEdit(product)">ویرایش</button>
                             }
                             @if (Can(Permissions.DeleteProducts))
@@ -586,6 +599,114 @@
     }
 
     private bool isExporting = false;
+
+    /// <summary>نمایش یا پنهان کردن کالا در فروشگاه اینترنتی</summary>
+    private async Task ToggleShopVisibility(Product product)
+    {
+        if (!Can(Permissions.ManageProducts))
+        {
+            Toasts.ShowError("شما اجازهٔ ویرایش کالا را ندارید");
+            return;
+        }
+
+        var tracked = await Db.Products.FirstOrDefaultAsync(x => x.Id == product.Id);
+
+        if (tracked is null)
+        {
+            return;
+        }
+
+        tracked.ShowInShop = !tracked.ShowInShop;
+        await Db.SaveChangesAsync();
+
+        Toasts.ShowSuccess(tracked.ShowInShop
+            ? $"کالای «{tracked.Name}» در فروشگاه نمایش داده می‌شود"
+            : $"کالای «{tracked.Name}» از فروشگاه پنهان شد");
+
+        await LoadProducts();
+    }
+
+    /// <summary>ذخیرهٔ گالری عکس کالا — عکس‌های قبلی جانشین می‌شوند</summary>
+    private async Task UploadGallery(InputFileChangeEventArgs e, Product product)
+    {
+        if (!Can(Permissions.ManageProducts))
+        {
+            Toasts.ShowError("شما اجازهٔ ویرایش کالا را ندارید");
+            return;
+        }
+
+        const int maxImages = 5;
+
+        var files = e.GetMultipleFiles(maxImages);
+        var saved = new List<string>();
+
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        var folder = Path.Combine(Environment.WebRootPath, "uploads", "products");
+        Directory.CreateDirectory(folder);
+
+        var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+
+        foreach (var file in files)
+        {
+            var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+            if (!allowed.Contains(extension) || file.Size > 3 * 1024 * 1024)
+            {
+                Toasts.ShowError($"عکس «{file.Name}» پذیرفته نشد؛ فقط عکس تا ۳ مگابایت");
+                continue;
+            }
+
+            var fileName = $"g{product.Id}_{Guid.NewGuid():N}{extension}";
+            var fullPath = Path.Combine(folder, fileName);
+
+            await using (var stream = File.Create(fullPath))
+            {
+                await file.OpenReadStream(3 * 1024 * 1024).CopyToAsync(stream);
+            }
+
+            saved.Add($"uploads/products/{fileName}");
+        }
+
+        try
+        {
+            var old = await Db.ProductImages.Where(i => i.ProductId == product.Id).ToListAsync();
+
+            foreach (var item in old)
+            {
+                var oldFull = Path.Combine(Environment.WebRootPath, item.Path.Replace('/', Path.DirectorySeparatorChar));
+
+                if (File.Exists(oldFull))
+                {
+                    File.Delete(oldFull);
+                }
+            }
+
+            Db.ProductImages.RemoveRange(old);
+
+            for (var i = 0; i < saved.Count; i++)
+            {
+                Db.ProductImages.Add(new ProductImage
+                {
+                    ProductId = product.Id,
+                    Path = saved[i],
+                    SortOrder = i + 1
+                });
+            }
+
+            await Db.SaveChangesAsync();
+
+            Toasts.ShowSuccess($"گالری کالای «{product.Name}» با {saved.Count} عکس ذخیره شد");
+            await LoadProducts();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیرهٔ گالری: {ex.Message}");
+        }
+    }
 
     /// <summary>ذخیرهٔ عکس کالا در پوشهٔ uploads/products — فقط برای کالاهای فعال</summary>
     private async Task UploadImage(InputFileChangeEventArgs e, Product product)

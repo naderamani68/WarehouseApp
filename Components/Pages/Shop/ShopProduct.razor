@@ -17,6 +17,12 @@
     }
     else
     {
+        <HeadContent>
+            <meta name="description" content="@(product.Name) — @(product.CategoryName ?? "کالا") — مشاهدهٔ قیمت و موجودی و ثبت سفارش اینترنتی" />
+            <meta property="og:title" content="@product.Name" />
+            <meta property="og:type" content="product" />
+        </HeadContent>
+
         <nav class="mb-3 small">
             <a href="/shop" class="shop-link">فهرست کالاها</a>
             <span class="text-muted mx-1">/</span>
@@ -27,9 +33,9 @@
             <div class="col-12 col-md-5">
                 <div class="shop-card">
                     <div class="shop-card-img" style="height:280px">
-                        @if (!string.IsNullOrWhiteSpace(product.ImagePath))
+                        @if (!string.IsNullOrWhiteSpace(product.MainImage))
                         {
-                            <img src="/@product.ImagePath" alt="@product.Name"
+                            <img src="/@product.MainImage" alt="@product.Name"
                                  style="width:100%;height:280px;object-fit:cover" />
                         }
                         else
@@ -37,6 +43,19 @@
                             <span class="bi bi-box-seam" aria-hidden="true"></span>
                         }
                     </div>
+
+                    @if (product.Gallery.Count > 1)
+                    {
+                        <div class="d-flex flex-wrap gap-2 p-2 justify-content-center">
+                            @foreach (var image in product.Gallery)
+                            {
+                                <a href="/@image" target="_blank">
+                                    <img src="/@image" alt="@product.Name"
+                                         style="width:56px;height:56px;object-fit:cover;border-radius:8px" />
+                                </a>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
 

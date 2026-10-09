@@ -43,6 +43,10 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ShopCatalogService>();
+// ===== سرویس‌های فروشگاه =====
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<SmsService>();
+
 // ===== محدودسازی نرخ درخواست =====
 // فروشگاه عمومی سهم کمتری دارد تا یک ربات نتواند پنل انبار را از کار بیندازد.
 builder.Services.AddRateLimiter(options =>

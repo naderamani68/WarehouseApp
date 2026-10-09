@@ -10,6 +10,10 @@
 
 <PageTitle>فروشگاه</PageTitle>
 
+<HeadContent>
+    <meta name="description" content="فهرست کالاهای موجود همراه با قیمت و موجودی — ثبت سفارش اینترنتی بدون نیاز به ثبت‌نام" />
+</HeadContent>
+
 <div class="container py-4">
 
     <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
@@ -49,9 +53,9 @@
                 <div class="shop-card">
                     <a href="/shop/product/@product.Id" class="text-decoration-none">
                         <div class="shop-card-img">
-                            @if (!string.IsNullOrWhiteSpace(product.ImagePath))
+                            @if (!string.IsNullOrWhiteSpace(product.MainImage))
                             {
-                                <img src="/@product.ImagePath" alt="@product.Name"
+                                <img src="/@product.MainImage" alt="@product.Name"
                                      style="width:100%;height:140px;object-fit:cover" />
                             }
                             else

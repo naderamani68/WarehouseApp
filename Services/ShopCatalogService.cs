@@ -26,7 +26,7 @@ public class ShopCatalogService
     {
         await using var db = await _factory.CreateDbContextAsync();
 
-        var query = db.Products.AsNoTracking().Where(p => p.IsActive);
+        var query = db.Products.AsNoTracking().Where(p => p.IsActive && p.ShowInShop);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -51,7 +51,11 @@ public class ShopCatalogService
             .Take(take)
             .ToListAsync();
 
-        return rows.Select(Map).ToList();
+        var items = rows.Select(Map).ToList();
+
+        await AttachGalleryAsync(db, items);
+
+        return items;
     }
 
     /// <summary>یک کالا برای صفحهٔ جزئیات</summary>
@@ -62,9 +66,18 @@ public class ShopCatalogService
         var product = await db.Products
             .AsNoTracking()
             .Include(p => p.Category)
-            .FirstOrDefaultAsync(p => p.IsActive && p.Id == id);
+            .FirstOrDefaultAsync(p => p.IsActive && p.ShowInShop && p.Id == id);
 
-        return product is null ? null : Map(product);
+        if (product is null)
+        {
+            return null;
+        }
+
+        var item = Map(product);
+
+        await AttachGalleryAsync(db, new List<ShopProductDto> { item });
+
+        return item;
     }
 
     /// <summary>چند کالا با شناسه — برای سبد خرید</summary>
@@ -82,10 +95,14 @@ public class ShopCatalogService
         var rows = await db.Products
             .AsNoTracking()
             .Include(p => p.Category)
-            .Where(p => p.IsActive && wanted.Contains(p.Id))
+            .Where(p => p.IsActive && p.ShowInShop && wanted.Contains(p.Id))
             .ToListAsync();
 
-        return rows.Select(Map).ToList();
+        var items = rows.Select(Map).ToList();
+
+        await AttachGalleryAsync(db, items);
+
+        return items;
     }
 
     /// <summary>فهرست دسته‌هایی که حداقل یک کالای فعال دارند</summary>
@@ -176,6 +193,36 @@ public class ShopCatalogService
         return digits.Length > 10 ? digits[^10..] : digits;
     }
 
+    /// <summary>پیوست گالری عکس به کالاها — با یک پرس‌وجو برای همه</summary>
+    private static async Task AttachGalleryAsync(ApplicationDbContext db, List<ShopProductDto> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var ids = items.Select(i => i.Id).ToList();
+
+        var images = await db.ProductImages
+            .AsNoTracking()
+            .Where(i => ids.Contains(i.ProductId))
+            .OrderBy(i => i.SortOrder)
+            .Select(i => new { i.ProductId, i.Path })
+            .ToListAsync();
+
+        var map = images
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Path).ToList());
+
+        foreach (var item in items)
+        {
+            if (map.TryGetValue(item.Id, out var paths))
+            {
+                item.Gallery.AddRange(paths);
+            }
+        }
+    }
+
     /// <summary>تبدیل کالا به مدل سبک فروشگاه — بعد از خواندن از پایگاه داده و در حافظه</summary>
     private static ShopProductDto Map(Product p)
     {
@@ -206,6 +253,12 @@ public record ShopProductDto(
     string? ImagePath,
     string? Description)
 {
+    /// <summary>عکس‌های گالری کالا</summary>
+    public List<string> Gallery { get; } = new();
+
+    /// <summary>عکس اصلی: عکس تکی و اگر نبود، نخستین عکس گالری</summary>
+    public string? MainImage => string.IsNullOrWhiteSpace(ImagePath) ? Gallery.FirstOrDefault() : ImagePath;
+
     /// <summary>عنوان فارسی واحد کالا</summary>
     public string UnitTitle => Unit switch
     {
