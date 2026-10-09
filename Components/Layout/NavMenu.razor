@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
 
 <div class="nav-scrollable">
     <nav class="flex-column">
@@ -45,7 +45,7 @@
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="@item.Href"
                                  Match="@(item.Exact ? NavLinkMatch.All : NavLinkMatch.Prefix)"
-                                 onclick="document.querySelector('.navbar-toggler').click()">
+                                 onclick="if (window.innerWidth < 641) { document.getElementById('sidebar-toggle').click(); }">
                             <span class="bi @item.Icon me-2" aria-hidden="true"></span>
                             @item.Title
                         </NavLink>

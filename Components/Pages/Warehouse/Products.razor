@@ -2,10 +2,14 @@
 @attribute [Authorize]
 @inherits PageBase
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Forms
 @using System.Globalization
+@using Microsoft.AspNetCore.Components.Forms
 @using WarehouseApp.Data
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 
+@using Microsoft.AspNetCore.Components.Forms
 @using WarehouseApp.Services
 @inject ExcelService Excel
 @inject ToastService Toasts
@@ -78,6 +82,11 @@
         </details>
     </div>
     <div class="col-md-4 text-end">
+        <label for="productImportFile" class="btn btn-outline-success mb-0" title="ورود گروهی کالاها از فایل اکسل">
+            <i class="bi bi-upload me-1"></i>
+            ورود از اکسل
+        </label>
+        <InputFile id="productImportFile" OnChange="ImportProducts" accept=".xlsx,.xlsm" class="d-none" />
         <button class="btn btn-success" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
             @if (isExporting)
             {
@@ -558,6 +567,135 @@
 
     private bool isExporting = false;
 
+    /// <summary>ورود گروهی کالا از فایل اکسل — ستون‌ها: کد، نام، واحد، قیمت فروش، بهای خرید، موجودی، حد سفارش، دسته</summary>
+    private async Task ImportProducts(InputFileChangeEventArgs e)
+    {
+        if (!Can(Permissions.ManageProducts))
+        {
+            Toasts.ShowError("شما اجازهٔ افزودن کالا را ندارید");
+            return;
+        }
+
+        if (e.File is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var stream = e.File.OpenReadStream(5 * 1024 * 1024);
+            using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
+            var sheet = workbook.Worksheets.FirstOrDefault();
+
+            if (sheet is null)
+            {
+                Toasts.ShowError("فایل اکسل هیچ برگه‌ای ندارد");
+                return;
+            }
+
+            var categories = await Db.Categories.ToListAsync();
+            var added = 0;
+            var updated = 0;
+            var skipped = 0;
+
+            foreach (var row in sheet.RowsUsed().Skip(1))
+            {
+                var code = row.Cell(1).GetString().Trim();
+                var name = row.Cell(2).GetString().Trim();
+
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var product = string.IsNullOrWhiteSpace(code)
+                    ? null
+                    : await Db.Products.FirstOrDefaultAsync(x => x.Code == code);
+
+                if (product is null)
+                {
+                    product = new Product
+                    {
+                        Code = string.IsNullOrWhiteSpace(code) ? null : code,
+                        CreatedAt = DateTime.Now
+                    };
+                    Db.Products.Add(product);
+                    added++;
+                }
+                else
+                {
+                    updated++;
+                }
+
+                product.Name = name;
+                product.Unit = ParseUnitText(row.Cell(3).GetString());
+
+                var salePrice = ParseNum(row.Cell(4).GetString());
+                if (salePrice > 0)
+                {
+                    product.SalePrice = salePrice;
+                }
+
+                var costPrice = ParseNum(row.Cell(5).GetString());
+                if (costPrice > 0)
+                {
+                    product.CostPrice = costPrice;
+                }
+
+                var quantity = ParseNum(row.Cell(6).GetString());
+                if (quantity > 0)
+                {
+                    product.Quantity = (int)quantity;
+                }
+
+                var reorder = ParseNum(row.Cell(7).GetString());
+                if (reorder > 0)
+                {
+                    product.ReorderLevel = (int)reorder;
+                }
+
+                var categoryName = row.Cell(8).GetString().Trim();
+                if (!string.IsNullOrWhiteSpace(categoryName))
+                {
+                    var category = categories.FirstOrDefault(c => c.Name == categoryName);
+                    if (category is null)
+                    {
+                        category = new Category { Name = categoryName };
+                        Db.Categories.Add(category);
+                        categories.Add(category);
+                    }
+
+                    product.Category = category;
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            await LoadProducts();
+
+            Toasts.ShowSuccess($"ورود از اکسل انجام شد: {added} کالای تازه، {updated} کالای به‌روزشده، {skipped} ردیف بی‌نام");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خواندن فایل اکسل: {ex.Message}");
+        }
+    }
+
+    /// <summary>تبدیل متن واحد کالا به مقدار شمارشی</summary>
+    private static ProductUnit ParseUnitText(string text)
+    {
+        return (text ?? string.Empty).Trim() switch
+        {
+            "کارتن" => ProductUnit.Carton,
+            "کیلوگرم" or "کیلو" => ProductUnit.Kilogram,
+            "لیتر" => ProductUnit.Liter,
+            "بسته" => ProductUnit.Pack,
+            "جعبه" => ProductUnit.Box,
+            "متر" => ProductUnit.Meter,
+            "خدمت" or "خدمات" => ProductUnit.Service,
+            _ => ProductUnit.Number
+        };
+    }
     private async Task ExportExcel()
     {
         if (!Can(Permissions.ExportExcel))

@@ -182,6 +182,10 @@
 <div class="card mb-4">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">🏬 موجودی کالا در انبارها</h5>
+        <button type="button" class="btn btn-sm btn-light" onclick="window.print()" title="چاپ همین گزارش">
+            <i class="bi bi-printer me-1"></i>
+            چاپ گزارش
+        </button>
         <button class="btn btn-sm btn-light" @onclick="ExportStockExcel" disabled="@(!Can(Permissions.ExportExcel) || isStockExporting)">
             @if (isStockExporting)
             {

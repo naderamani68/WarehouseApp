@@ -1,147 +1,750 @@
-﻿/* ============================================
-   Theme Variables — تم روشن و تیره
-   ============================================ */
+/* ==========================================================
+   طرح ظاهری تازه — سیستم مدیریت انبار
+   این فایل آخرین CSS بارگذاری می‌شود، پس بر همه چیز اولویت دارد
+   ========================================================== */
 
+/* ----------------------------------------------------------
+   ۱) متغیرهای رنگ — تم روشن
+   ---------------------------------------------------------- */
 :root {
-    /* ☀️ تم روشن (پیش‌فرض) */
-    --bg-body: #f5f7fa;
+    /* پس‌زمینه و متن */
+    --bg-body: #f3f5fb;
     --bg-card: #ffffff;
-    --bg-header: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --text-main: #1a202c;
-    --text-muted: #718096;
-    --border-color: #e2e8f0;
-    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --accent: #667eea;
-    --accent-hover: #5568d3;
+    --bg-soft: #f8fafc;
+    --bg-hover: #eef2f9;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e4e8f1;
+
+    /* رنگ اصلی — بنفش نیلی */
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-2: #7c3aed;
+    --accent-soft: rgba(79, 70, 229, 0.10);
+    --accent-ring: rgba(99, 102, 241, 0.22);
+    --bg-header: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+
+    /* رنگ‌های وضعیت */
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #0ea5e9;
+
+    /* سایه و گردی گوشه‌ها */
+    --shadow: 0 12px 32px rgba(15, 23, 42, 0.09);
+    --shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 24px 60px rgba(15, 23, 42, 0.16);
+    --radius: 16px;
+    --radius-sm: 10px;
+
+    /* نوار کنار */
+    --sidebar-bg: linear-gradient(180deg, #131a33 0%, #1d1145 55%, #2a1152 100%);
+    --sidebar-text: #c3cee6;
+    --sidebar-text-strong: #ffffff;
+    --sidebar-group: #8e9cc0;
+    --sidebar-hover: rgba(255, 255, 255, 0.07);
+    --sidebar-active: linear-gradient(90deg, rgba(99, 102, 241, 0.42), rgba(139, 92, 246, 0.16));
+    --sidebar-width: 268px;
 }
 
-/* 🌙 تم تیره — وقتی data-theme="dark" باشه فعال می‌شه */
+/* تم تیره */
 [data-theme="dark"] {
-    --bg-body: #0f172a;
-    --bg-card: #1e293b;
-    --bg-header: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    --text-main: #e2e8f0;
-    --text-muted: #94a3b8;
-    --border-color: #334155;
-    --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --bg-body: #080d1c;
+    --bg-card: #121a2e;
+    --bg-soft: #16203a;
+    --bg-hover: #1b2745;
+    --text-main: #e7edf9;
+    --text-muted: #93a3bd;
+    --border-color: #24304d;
+
     --accent: #818cf8;
     --accent-hover: #6366f1;
+    --accent-2: #a78bfa;
+    --accent-soft: rgba(129, 140, 248, 0.14);
+    --accent-ring: rgba(129, 140, 248, 0.28);
+    --bg-header: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+    --sidebar-bg: linear-gradient(180deg, #050912 0%, #150c2e 55%, #22103f 100%);
+    --sidebar-hover: rgba(255, 255, 255, 0.06);
 }
 
-/* ============================================
-   Transition نرم برای تغییر تم
-   ============================================ */
-
+/* ----------------------------------------------------------
+   ۲) پایه — بدنه، تیترها، پیوندها، نوار پیمایش
+   ---------------------------------------------------------- */
 * {
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
-/* ============================================
-   استایل‌های عمومی
-   ============================================ */
+html, body {
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+}
 
 body {
     background-color: var(--bg-body);
+    background-image:
+        radial-gradient(1100px 520px at 100% -12%, rgba(99, 102, 241, 0.12), transparent 60%),
+        radial-gradient(900px 480px at -10% 110%, rgba(139, 92, 246, 0.10), transparent 60%);
+    background-attachment: fixed;
     color: var(--text-main);
-    font-family: 'Vazirmatn', Tahoma, sans-serif;
     margin: 0;
 }
 
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+h1 {
+    font-size: 1.65rem;
+    letter-spacing: -0.2px;
+}
+
+a {
+    color: var(--accent);
+}
+
+    a:hover {
+        color: var(--accent-hover);
+    }
+
+::selection {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* نوار پیمایش نازک و مدرن */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 140, 170, 0.55) transparent;
+}
+
+    *::-webkit-scrollbar {
+        width: 9px;
+        height: 9px;
+    }
+
+    *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background-color: rgba(128, 140, 170, 0.45);
+        border-radius: 10px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+        *::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(128, 140, 170, 0.75);
+        }
+
+/* ----------------------------------------------------------
+   ۳) چیدمان کلی
+   ---------------------------------------------------------- */
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+    min-width: 0;
+}
+
+.content {
+    padding-top: 1.25rem;
+    padding-bottom: 2.5rem;
+}
+
+/* ---- نوار بالای محتوا ---- */
+main .top-row {
+    background-color: color-mix(in srgb, var(--bg-card) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    min-height: 4rem;
+    height: auto;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+
+/* ---- دکمهٔ باز و بستن منو ---- */
+.sidebar-toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.sidebar-toggle-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    margin: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-soft);
+    color: var(--text-main);
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+    .sidebar-toggle-btn:hover {
+        background: var(--accent);
+        color: #fff;
+        border-color: transparent;
+        transform: translateY(-1px);
+    }
+
+/* پس‌زمینهٔ تیره پشت کشوی موبایل */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 12, 24, 0.5);
+    z-index: 1040;
+}
+
+/* ----------------------------------------------------------
+   ۴) نوار کنار (منو)
+   ---------------------------------------------------------- */
+.sidebar {
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+}
+
+/* سربرگ نام برنامه داخل منو */
+.sidebar .top-row {
+    display: flex;
+    align-items: center;
+    height: 4rem;
+    padding: 0 1.15rem;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar .navbar-brand {
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-scrollable {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 1.25rem;
+}
+
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar hr {
+    border-color: rgba(255, 255, 255, 0.10);
+    margin: 0.35rem 1rem;
+}
+
+/* ---- عنوان دسته‌ها ---- */
+.nav-group .nav-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.15rem 0.45rem 1.15rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--sidebar-group);
+    text-transform: uppercase;
+}
+
+    .nav-group .nav-group-header::-webkit-details-marker {
+        display: none;
+    }
+
+    .nav-group .nav-group-header::marker {
+        content: "";
+    }
+
+    .nav-group .nav-group-header:hover {
+        color: var(--sidebar-text-strong);
+    }
+
+.nav-group[open] .nav-group-header {
+    color: #dbe3f7;
+}
+
+.nav-group .nav-group-chevron {
+    margin: 0;
+    width: 0.85rem;
+    height: 0.85rem;
+    font-size: 0.68rem;
+    opacity: 0.8;
+    transition: transform 0.22s ease;
+}
+
+.nav-group[open] .nav-group-chevron {
+    transform: rotate(180deg);
+}
+
+/* ---- آیتم‌های منو ---- */
+.sidebar .nav-item {
+    font-size: 0.9rem;
+    padding-bottom: 0.15rem;
+}
+
+    .sidebar .nav-item:first-of-type {
+        padding-top: 0.15rem;
+    }
+
+    .sidebar .nav-item:last-of-type {
+        padding-bottom: 0.5rem;
+    }
+
+.sidebar .nav-item .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: auto;
+    margin: 0 0.7rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: var(--radius-sm);
+    color: var(--sidebar-text);
+    background: none;
+    border: none;
+    font-weight: 500;
+    text-decoration: none;
+    position: relative;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+    .sidebar .nav-item .nav-link .bi {
+        font-size: 1.02rem;
+        opacity: 0.9;
+    }
+
+    .sidebar .nav-item .nav-link:hover {
+        background: var(--sidebar-hover);
+        color: var(--sidebar-text-strong);
+        transform: translateX(-2px);
+    }
+
+    .sidebar .nav-item .nav-link.active {
+        background: var(--sidebar-active);
+        color: #fff;
+        font-weight: 600;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+    }
+
+        .sidebar .nav-item .nav-link.active::before {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 22%;
+            bottom: 22%;
+            width: 3px;
+            border-radius: 3px;
+            background: linear-gradient(180deg, #a5b4fc, #8b5cf6);
+        }
+
+        .sidebar .nav-item .nav-link.active .bi {
+            opacity: 1;
+            color: #c7d2fe;
+        }
+
+/* ----------------------------------------------------------
+   ۵) کارت‌ها
+   ---------------------------------------------------------- */
 .card, .panel {
     background-color: var(--bg-card);
     color: var(--text-main);
     border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.card:hover {
     box-shadow: var(--shadow);
-    border-radius: 12px;
 }
 
-/* ============================================
-   دکمه سوییچ تم
-   ============================================ */
-
-.theme-toggle {
-    background: var(--bg-body);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    font-size: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.3s ease, background 0.3s ease;
+.card-header {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    padding: 1rem 1.25rem;
 }
 
-    .theme-toggle:hover {
-        transform: rotate(20deg) scale(1.1);
-        background: var(--accent);
-        color: #fff;
+.card-footer {
+    background-color: transparent;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ----------------------------------------------------------
+   ۶) دکمه‌ها
+   ---------------------------------------------------------- */
+.btn {
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    padding: 0.45rem 0.95rem;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+    .btn:active {
+        transform: translateY(1px);
     }
 
-/* ============================================
-   Progress Bar موجودی محصولات
-   ============================================ */
+.btn-primary {
+    color: #fff;
+    background-image: linear-gradient(135deg, #6366f1, #4f46e5);
+    border: none;
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
+}
 
+    .btn-primary:hover, .btn-primary:focus {
+        background-image: linear-gradient(135deg, #4f46e5, #4338ca);
+        color: #fff;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(79, 70, 229, 0.36);
+    }
+
+.btn-success {
+    color: #fff;
+    background-image: linear-gradient(135deg, #34d399, #10b981);
+    border: none;
+}
+
+.btn-danger {
+    color: #fff;
+    background-image: linear-gradient(135deg, #f87171, #ef4444);
+    border: none;
+}
+
+.btn-warning {
+    color: #422006;
+    background-image: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border: none;
+}
+
+.btn-outline-primary {
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    background: transparent;
+}
+
+    .btn-outline-primary:hover {
+        background: var(--accent);
+        color: #fff;
+        border-color: transparent;
+    }
+
+.btn-outline-secondary {
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    background: var(--bg-soft);
+}
+
+    .btn-outline-secondary:hover {
+        background: var(--bg-hover);
+        color: var(--text-main);
+        border-color: var(--border-color);
+    }
+
+.btn-outline-danger {
+    color: var(--danger);
+    border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+    .btn-outline-danger:hover {
+        background: var(--danger);
+        color: #fff;
+        border-color: transparent;
+    }
+
+.btn-link {
+    color: var(--accent);
+}
+
+.btn:focus, .btn:active:focus, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.22rem var(--accent-ring);
+}
+
+/* ----------------------------------------------------------
+   ۷) جدول‌ها
+   ---------------------------------------------------------- */
+.table {
+    color: var(--text-main);
+    border-color: var(--border-color);
+    margin-bottom: 0;
+    vertical-align: middle;
+}
+
+    .table > :not(caption) > * > * {
+        padding: 0.7rem 0.85rem;
+        background-color: transparent;
+        border-bottom-color: var(--border-color);
+    }
+
+    .table > thead {
+        background-color: var(--bg-soft);
+    }
+
+        .table > thead th {
+            background-color: var(--bg-soft);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+    .table > tbody tr {
+        transition: background 0.15s ease;
+    }
+
+        .table > tbody tr:hover {
+            background-color: var(--bg-hover);
+        }
+
+.table-responsive {
+    border-radius: var(--radius);
+}
+
+/* ----------------------------------------------------------
+   ۸) فرم‌ها
+   ---------------------------------------------------------- */
+.form-label {
+    font-weight: 500;
+    color: var(--text-main);
+    margin-bottom: 0.3rem;
+    font-size: 0.88rem;
+}
+
+.form-control, .form-select {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.7rem;
+}
+
+    .form-control::placeholder {
+        color: var(--text-muted);
+        opacity: 0.75;
+    }
+
+    .form-control:focus, .form-select:focus {
+        background-color: var(--bg-card);
+        color: var(--text-main);
+        border-color: var(--accent);
+    }
+
+.form-control-sm, .form-select-sm {
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.input-group-text {
+    background-color: var(--bg-soft);
+    border-color: var(--border-color);
+    color: var(--text-muted);
+}
+
+/* ----------------------------------------------------------
+   ۹) نشان‌ها، هشدارها، برگه‌ها
+   ---------------------------------------------------------- */
+.badge {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+}
+
+.bg-primary {
+    background-color: var(--accent) !important;
+}
+
+.text-primary {
+    color: var(--accent) !important;
+}
+
+.alert {
+    border: none;
+    border-radius: var(--radius-sm);
+    border-right: 4px solid transparent;
+}
+
+.alert-info {
+    background: var(--accent-soft);
+    color: var(--text-main);
+    border-right-color: var(--info);
+}
+
+.alert-warning {
+    background: color-mix(in srgb, var(--warning) 14%, transparent);
+    color: var(--text-main);
+    border-right-color: var(--warning);
+}
+
+.alert-danger {
+    background: color-mix(in srgb, var(--danger) 13%, transparent);
+    color: var(--text-main);
+    border-right-color: var(--danger);
+}
+
+.alert-success {
+    background: color-mix(in srgb, var(--success) 14%, transparent);
+    color: var(--text-main);
+    border-right-color: var(--success);
+}
+
+.nav-tabs {
+    border-bottom: 1px solid var(--border-color);
+}
+
+    .nav-tabs .nav-link {
+        color: var(--text-muted);
+        border: none;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+    }
+
+        .nav-tabs .nav-link.active {
+            color: var(--accent);
+            background: transparent;
+            border-bottom-color: var(--accent);
+            font-weight: 600;
+        }
+
+.dropdown-menu {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+}
+
+.dropdown-item {
+    color: var(--text-main);
+}
+
+    .dropdown-item:hover {
+        background-color: var(--bg-hover);
+        color: var(--text-main);
+    }
+
+.modal-content {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+}
+
+.page-link {
+    color: var(--accent);
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+    .page-link:hover {
+        background-color: var(--accent-soft);
+        color: var(--accent);
+    }
+
+.page-item.active .page-link {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.list-group-item {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+/* ----------------------------------------------------------
+   ۱۰) نوار موجودی کالا
+   ---------------------------------------------------------- */
 .stock-bar {
     width: 100%;
     min-width: 80px;
-    height: 10px;
-    background-color: var(--bg-body);
+    height: 9px;
+    background-color: var(--bg-hover);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
     position: relative;
 }
 
 .stock-bar-fill {
     height: 100%;
-    border-radius: 5px;
+    border-radius: 7px;
     transition: width 0.6s ease-in-out;
     min-width: 2px;
 }
 
-    /* 🟢 موجودی خوب (۶۷٪ تا ۱۰۰٪) */
     .stock-bar-fill.stock-bar-green {
-        background: linear-gradient(90deg, #20c997, #28a745);
+        background: linear-gradient(90deg, #34d399, #10b981);
     }
 
-    /* 🟡 موجودی متوسط (۳۴٪ تا ۶۶٪) */
     .stock-bar-fill.stock-bar-yellow {
-        background: linear-gradient(90deg, #ffc107, #ffb300);
+        background: linear-gradient(90deg, #fbbf24, #f59e0b);
     }
 
-    /* 🔴 موجودی کم (۰٪ تا ۳۳٪) */
     .stock-bar-fill.stock-bar-red {
-        background: linear-gradient(90deg, #dc3545, #c82333);
+        background: linear-gradient(90deg, #f87171, #ef4444);
     }
 
-/* نمایش تمیزتر درصد زیر نوار */
 .stock-bar + small {
     display: inline-block;
     margin-top: 3px;
     font-size: 0.75rem;
 }
 
-/* ============================================
-   باکس راهنمای وضعیت موجودی
-   ============================================ */
-
+/* ----------------------------------------------------------
+   ۱۱) راهنمای موجودی (details)
+   ---------------------------------------------------------- */
 .stock-help {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 8px 12px;
-    box-shadow: var(--shadow);
-    transition: background-color 0.3s, border-color 0.3s;
+    box-shadow: var(--shadow-sm);
 }
 
     .stock-help summary {
         cursor: pointer;
         font-weight: 600;
         color: var(--text-main);
-        list-style: none; /* حذف فلش پیش‌فرض */
+        list-style: none;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -150,7 +753,7 @@ body {
     }
 
         .stock-help summary::-webkit-details-marker {
-            display: none; /* حذف فلش در کروم/سافاری */
+            display: none;
         }
 
         .stock-help summary::before {
@@ -162,7 +765,7 @@ body {
         }
 
     .stock-help[open] summary::before {
-        transform: rotate(90deg); /* فلش چرخش کنه وقتی بازه */
+        transform: rotate(90deg);
     }
 
     .stock-help summary:hover {
@@ -180,7 +783,7 @@ body {
 }
 
     .stock-help-content ul {
-        padding-right: 20px; /* RTL: padding راست */
+        padding-right: 20px;
         margin-bottom: 8px;
     }
 
@@ -200,10 +803,9 @@ body {
     }
 }
 
-/* ============================================
-   پیام‌های شناور (Toast)
-   ============================================ */
-
+/* ----------------------------------------------------------
+   ۱۲) پیام‌های شناور
+   ---------------------------------------------------------- */
 .toast-stack {
     position: fixed;
     bottom: 20px;
@@ -223,8 +825,8 @@ body {
     color: var(--text-main);
     border: 1px solid var(--border-color);
     border-right: 5px solid var(--accent);
-    border-radius: 10px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
     padding: 12px 14px;
     font-size: 0.95rem;
     line-height: 1.7;
@@ -252,12 +854,12 @@ body {
 }
 
     .toast-close:hover {
-        color: #dc3545;
+        color: var(--danger);
     }
 
-.toast-item.toast-success { border-right-color: #28a745; }
-.toast-item.toast-error   { border-right-color: #dc3545; }
-.toast-item.toast-info    { border-right-color: var(--accent); }
+.toast-item.toast-success { border-right-color: var(--success); }
+.toast-item.toast-error { border-right-color: var(--danger); }
+.toast-item.toast-info { border-right-color: var(--accent); }
 
 @keyframes toastIn {
     from {
@@ -271,15 +873,7 @@ body {
     }
 }
 
-@media (max-width: 576px) {
-    .toast-stack {
-        left: 10px;
-        right: 10px;
-        max-width: none;
-    }
-}
-
-/* حالت درون‌صفحه‌ای: کنار دکمهٔ ثبت، بدون شناوری */
+/* حالت درون‌صفحه‌ای */
 .toast-stack-inline {
     position: static;
     bottom: auto;
@@ -300,32 +894,31 @@ body {
     font-size: 0.78rem;
 }
 
-/* ============================================
-   صفحه‌های ورود و راه‌اندازی
-   ============================================ */
-
+/* ----------------------------------------------------------
+   ۱۳) صفحه‌های ورود و راه‌اندازی
+   ---------------------------------------------------------- */
 .auth-page {
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #a855f7 100%);
     padding: 24px;
 }
 
 [data-theme="dark"] .auth-page {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background: linear-gradient(135deg, #090f22 0%, #1e1b4b 60%, #3b0764 100%);
 }
 
 .auth-box {
     width: 100%;
-    max-width: 420px;
+    max-width: 430px;
     background-color: var(--bg-card);
     color: var(--text-main);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-    padding: 28px 26px;
+    border-radius: 22px;
+    box-shadow: var(--shadow-lg);
+    padding: 30px 28px;
 }
 
 .auth-logo {
@@ -333,31 +926,41 @@ body {
     line-height: 1;
 }
 
-/* ============================================
-   جعبهٔ کاربر و دکمهٔ خروج در سربرگ
-   ============================================ */
-
+/* ----------------------------------------------------------
+   ۱۴) جعبهٔ کاربر، تم و دکمهٔ خروج
+   ---------------------------------------------------------- */
 .user-box {
     display: inline-flex;
     flex-direction: column;
     align-items: flex-end;
     line-height: 1.3;
     color: var(--text-main);
-    background: var(--bg-body);
+    background: var(--bg-soft);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     padding: 4px 12px;
+    text-decoration: none;
 }
 
 .user-name {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-weight: 600;
 }
 
 .user-role {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
 }
+
+a.user-box:hover {
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+}
+
+    a.user-box:hover .user-role {
+        color: rgba(255, 255, 255, 0.9);
+    }
 
 .logout-btn {
     display: inline-flex;
@@ -366,32 +969,195 @@ body {
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: var(--bg-body);
+    background: var(--bg-soft);
     border: 1px solid var(--border-color);
     color: var(--text-main);
     font-size: 18px;
     text-decoration: none;
-    transition: background 0.3s ease, transform 0.3s ease;
+    transition: background 0.25s ease, transform 0.25s ease;
 }
 
     .logout-btn:hover {
-        background: #dc3545;
+        background: var(--danger);
         color: #fff;
-        transform: scale(1.08);
+        transform: scale(1.06);
     }
 
-/* جعبهٔ کاربر حالا یک پیوند به پروفایل است */
-a.user-box {
-    text-decoration: none;
-    transition: background 0.3s ease, transform 0.3s ease;
+.theme-toggle {
+    background: var(--bg-soft);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    font-size: 19px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-    a.user-box:hover {
+    .theme-toggle:hover {
+        transform: rotate(20deg) scale(1.08);
         background: var(--accent);
         color: #fff;
-        transform: translateY(-1px);
     }
 
-        a.user-box:hover .user-role {
-            color: rgba(255, 255, 255, 0.9);
-        }
+/* ----------------------------------------------------------
+   ۱۵) پیام خطای برنامه
+   ---------------------------------------------------------- */
+#blazor-error-ui {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #fff;
+    bottom: 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.3);
+    display: none;
+    left: 0;
+    padding: 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 2000;
+}
+
+    #blazor-error-ui .reload {
+        color: #fff;
+        text-decoration: underline;
+        margin-right: 1rem;
+    }
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+        color: #fff;
+    }
+
+/* ----------------------------------------------------------
+   ۱۶) نمای موبایل — کشوی کنار یکدست
+   ---------------------------------------------------------- */
+@media (max-width: 640.98px) {
+    .page {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 84vw;
+        max-width: 300px;
+        z-index: 1050;
+        display: flex;
+        flex-direction: column;
+        transform: translateX(100%);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: -10px 0 34px rgba(0, 0, 0, 0.4);
+    }
+
+    /* با تیک خوردن چک‌باکس، کشو داخل می‌آید */
+    .sidebar-toggle-input:checked ~ .sidebar {
+        transform: translateX(0);
+    }
+
+    .sidebar-toggle-input:checked ~ .sidebar-backdrop {
+        display: block;
+    }
+
+    .nav-scrollable {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    main .top-row {
+        padding-left: 0.85rem !important;
+        padding-right: 0.85rem !important;
+        gap: 0.5rem;
+    }
+
+    .content {
+        padding-left: 0.85rem !important;
+        padding-right: 0.85rem !important;
+    }
+
+    .user-role {
+        display: none;
+    }
+
+    .card-body, .card-header {
+        padding: 0.9rem;
+    }
+}
+
+/* ----------------------------------------------------------
+   ۱۷) نمای دسکتاپ
+   ---------------------------------------------------------- */
+@media (min-width: 641px) {
+    .page {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* با تیک خوردن چک‌باکس، ستون کنار کنار می‌رود */
+    .sidebar-toggle-input:checked ~ .sidebar {
+        display: none;
+    }
+
+    .sidebar-backdrop {
+        display: none !important;
+    }
+
+    main .top-row, .content {
+        padding-left: 2rem !important;
+        padding-right: 1.5rem !important;
+    }
+}
+
+/* ----------------------------------------------------------
+   ۱۸) چاپ
+   ---------------------------------------------------------- */
+@media print {
+    .sidebar,
+    .sidebar-backdrop,
+    main .top-row,
+    .toast-stack,
+    .btn,
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background: #fff !important;
+        background-image: none !important;
+        color: #000;
+    }
+
+    .page {
+        display: block;
+    }
+
+    .content {
+        padding: 0 !important;
+    }
+
+    .card, .panel {
+        box-shadow: none !important;
+        border: 1px solid #d0d0d0 !important;
+        break-inside: avoid;
+    }
+
+    .table > :not(caption) > * > * {
+        border-color: #d0d0d0 !important;
+    }
+}
