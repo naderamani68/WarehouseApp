@@ -54,6 +54,12 @@ else
                         <i class="bi bi-person-plus"></i>
                         مشتری تازه
                     </button>
+
+                    <button class="btn btn-sm btn-link p-0 mt-1 ms-2" @onclick="SelectWalkInCustomerAsync" disabled="@quickBusy"
+                            title="فروش بی‌نام — برای فروش حضوری و همسایه">
+                        <i class="bi bi-person-dash"></i>
+                        متفرقه
+                    </button>
                 }
             </div>
             <div class="col-md-3">
@@ -436,6 +442,8 @@ else
     private string nextNumber = string.Empty;
     private List<LineDraft> lines = new();
 
+    private const string WalkInCustomerName = "متفرقه";
+
     private bool showQuickCustomer;
     private bool quickBusy;
     private string? quickName;
@@ -764,6 +772,52 @@ else
         catch (Exception ex)
         {
             Toasts.ShowError($"خطا در ثبت مشتری: {ex.Message}");
+        }
+        finally
+        {
+            quickBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// انتخاب مشتری «متفرقه» برای فروش بی‌نام (فروش حضوری، همسایه و مانند آن).
+    /// اگر این مشتری نباشد، یک بار ساخته می‌شود و بعد همیشه انتخاب می‌شود.
+    /// </summary>
+    private async Task SelectWalkInCustomerAsync()
+    {
+        try
+        {
+            quickBusy = true;
+
+            var party = await Db.Parties.FirstOrDefaultAsync(p => p.Name == WalkInCustomerName);
+
+            if (party is null)
+            {
+                party = new Party
+                {
+                    Name = WalkInCustomerName,
+                    Type = PartyType.Customer,
+                    IsActive = true,
+                    Code = "CU-WALKIN",
+                    Notes = "برای فروش‌های بی‌نام مانند فروش حضوری و همسایه"
+                };
+
+                Db.Parties.Add(party);
+                await Db.SaveChangesAsync();
+                customers.Add(party);
+
+                Toasts.ShowSuccess("مشتری «متفرقه» ساخته و انتخاب شد");
+            }
+            else
+            {
+                Toasts.ShowSuccess("مشتری «متفرقه» انتخاب شد");
+            }
+
+            formPartyId = party.Id;
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در انتخاب مشتری متفرقه: {ex.Message}");
         }
         finally
         {

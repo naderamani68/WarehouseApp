@@ -118,6 +118,34 @@ else
         }
     </div>
 
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">فروش به تفکیک کانال</h5>
+        <a class="btn btn-sm btn-outline-secondary" href="crm/channels">مدیریت کانال‌ها</a>
+    </div>
+
+    <div class="card p-3 mb-4">
+        @if (channelSales.Count == 0)
+        {
+            <div class="text-muted">هنوز فروش تأییدشده‌ای با کانال مشخص ثبت نشده است.</div>
+        }
+        else
+        {
+            @foreach (var row in channelSales)
+            {
+                var percent = maxChannelTotal <= 0 ? 0 : (int)Math.Round(row.Total / maxChannelTotal * 100);
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>@row.Name <span class="text-muted">(@row.Count.ToString("N0", Fa) سفارش)</span></span>
+                        <span class="fw-bold">@Money(row.Total)</span>
+                    </div>
+                    <div style="background:rgba(128,128,128,.15);border-radius:8px;height:14px;overflow:hidden;">
+                        <div style="width:@(percent)%;height:100%;background:var(--accent,#4f46e5);transition:width .8s cubic-bezier(.4,0,.2,1);"></div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
     <div class="row g-4">
         <div class="col-lg-6">
             <div class="card p-3 h-100">
@@ -298,6 +326,7 @@ else
         }
 
         stats = await CrmService.GetStatsAsync(Db);
+        await LoadChannelSalesAsync();
     }
 
     private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
@@ -382,6 +411,29 @@ else
             isExporting = false;
         }
     }
+
+    private List<ChannelSaleRow> channelSales = new();
+
+    private decimal maxChannelTotal => channelSales.Count == 0 ? 0m : channelSales.Max(r => r.Total);
+
+    /// <summary>جمع فروش تأییدشده به تفکیک کانال — جمع در حافظه انجام می‌شود تا پرس‌وجو ساده بماند</summary>
+    private async Task LoadChannelSalesAsync()
+    {
+        var confirmed = await Db.SalesOrders
+            .AsNoTracking()
+            .Include(o => o.Channel)
+            .Include(o => o.Items)
+            .Where(o => o.Status == OrderStatus.Confirmed)
+            .ToListAsync();
+
+        channelSales = confirmed
+            .GroupBy(o => o.Channel?.Name ?? "نامشخص")
+            .Select(g => new ChannelSaleRow(g.Key, g.Count(), g.Sum(o => o.Total)))
+            .OrderByDescending(r => r.Total)
+            .ToList();
+    }
+
+    private record ChannelSaleRow(string Name, int Count, decimal Total);
 
     private record DashboardRow(string Title, string Value);
 }

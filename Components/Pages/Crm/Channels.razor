@@ -1,0 +1,316 @@
+﻿@page "/crm/channels"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+@* مدیریت کانال‌های فروش — اضافه،改名، غیرفعال و حذف بدون تغییر برنامه *@
+
+<PageTitle>کانال‌های فروش | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">🏬 کانال‌های فروش</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "افزودن کانال تازه" : $"ویرایش «{editing.Name}»")</h5>
+
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">نام کانال</label>
+                <input class="form-control" @bind="formName" placeholder="مثلاً: واتساپ" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">توضیح کوتاه</label>
+                <input class="form-control" @bind="formHint" placeholder="مثلاً: سفارش از واتساپ" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">ترتیب نمایش</label>
+                <input type="number" class="form-control" dir="ltr" @bind="formSort" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">فعال</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="formActive" />
+                </div>
+            </div>
+            <div class="col-md-2">
+                @if (CanManage)
+                {
+                    <button class="btn btn-primary w-100" @onclick="SaveAsync" disabled="@busy">
+                        @(editing is null ? "افزودن" : "ذخیره تغییرات")
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (editing is not null)
+        {
+            <button class="btn btn-outline-secondary mt-3" @onclick="ResetForm">فرم جدید</button>
+        }
+
+        <div class="text-muted small mt-3">
+            کانال‌های غیرفعال در فرم سفارش نمایش داده نمی‌شوند، ولی سابقهٔ فروش‌های قبلی حفظ می‌شود.
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:60px">ترتیب</th>
+                        <th>نام کانال</th>
+                        <th>توضیح</th>
+                        <th style="width:110px">سفارش‌ها</th>
+                        <th style="width:110px">وضعیت</th>
+                        <th style="width:230px">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (channels.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">کانالی ثبت نشده است.</td>
+                        </tr>
+                    }
+                    @foreach (var channel in channels)
+                    {
+                        <tr>
+                            <td dir="ltr">@channel.SortOrder.ToString("N0", Fa)</td>
+                            <td class="fw-semibold">@channel.Name</td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(channel.Hint) ? "—" : channel.Hint)</td>
+                            <td>
+                                @{
+                                    var used = usage.TryGetValue(channel.Id, out var count) ? count : 0;
+                                }
+                                @used.ToString("N0", Fa)
+                            </td>
+                            <td>
+                                @if (channel.IsActive)
+                                {
+                                    <span class="badge bg-success">فعال</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">غیرفعال</span>
+                                }
+                            </td>
+                            <td>
+                                @if (CanManage)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(channel)">ویرایش</button>
+
+                                    @if (channel.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => SetActiveAsync(channel, false)">غیرفعال</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-success me-1" @onclick="() => SetActiveAsync(channel, true)">فعال</button>
+                                    }
+
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(channel)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    private bool allowed;
+    private bool CanManage;
+    private bool busy;
+
+    private List<SalesChannel> channels = new();
+    private Dictionary<int, int> usage = new();
+
+    private SalesChannel? editing;
+    private string? formName;
+    private string? formHint;
+    private int formSort = 10;
+    private bool formActive = true;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewCrm);
+        CanManage = await Access.HasAsync(user, Permissions.ManageCrm);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        channels = await Db.SalesChannels
+            .OrderBy(c => c.SortOrder)
+            .ThenBy(c => c.Id)
+            .ToListAsync();
+
+        var grouped = await Db.SalesOrders
+            .Where(o => o.ChannelId != null)
+            .GroupBy(o => o.ChannelId!.Value)
+            .Select(g => new { Id = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        usage = grouped.ToDictionary(x => x.Id, x => x.Count);
+    }
+
+    private void StartEdit(SalesChannel channel)
+    {
+        editing = channel;
+        formName = channel.Name;
+        formHint = channel.Hint;
+        formSort = channel.SortOrder;
+        formActive = channel.IsActive;
+    }
+
+    private void ResetForm()
+    {
+        editing = null;
+        formName = null;
+        formHint = null;
+        formSort = (channels.Count == 0 ? 1 : channels.Max(c => c.SortOrder) + 1);
+        formActive = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(formName) || formName.Trim().Length < 2)
+        {
+            Toasts.ShowError("نام کانال را کامل بنویسید");
+            return;
+        }
+
+        var name = formName.Trim();
+
+        var duplicate = await Db.SalesChannels
+            .AnyAsync(c => c.Name == name && (editing == null || c.Id != editing.Id));
+
+        if (duplicate)
+        {
+            Toasts.ShowError("کانالی با همین نام از قبل وجود دارد");
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            if (editing is null)
+            {
+                Db.SalesChannels.Add(new SalesChannel
+                {
+                    Name = name,
+                    Hint = string.IsNullOrWhiteSpace(formHint) ? null : formHint.Trim(),
+                    SortOrder = formSort,
+                    IsActive = formActive,
+                    CreatedAt = DateTime.Now
+                });
+            }
+            else
+            {
+                var entity = await Db.SalesChannels.FirstAsync(c => c.Id == editing.Id);
+                entity.Name = name;
+                entity.Hint = string.IsNullOrWhiteSpace(formHint) ? null : formHint.Trim();
+                entity.SortOrder = formSort;
+                entity.IsActive = formActive;
+            }
+
+            await Db.SaveChangesAsync();
+
+            Toasts.ShowSuccess(editing is null ? $"کانال «{name}» اضافه شد" : $"کانال «{name}» ذخیره شد");
+
+            ResetForm();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task SetActiveAsync(SalesChannel channel, bool active)
+    {
+        try
+        {
+            var entity = await Db.SalesChannels.FirstAsync(c => c.Id == channel.Id);
+            entity.IsActive = active;
+            await Db.SaveChangesAsync();
+
+            Toasts.ShowSuccess($"کانال «{entity.Name}» {(active ? "فعال" : "غیرفعال")} شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteAsync(SalesChannel channel)
+    {
+        var used = usage.TryGetValue(channel.Id, out var count) ? count : 0;
+
+        if (used > 0)
+        {
+            Toasts.ShowError($"این کانال در {used} سفارش استفاده شده است؛ به‌جای حذف، غیرفعالش کن");
+            return;
+        }
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"کانال «{channel.Name}» حذف شود؟");
+
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            var entity = await Db.SalesChannels.FirstAsync(c => c.Id == channel.Id);
+            Db.SalesChannels.Remove(entity);
+            await Db.SaveChangesAsync();
+
+            if (editing?.Id == channel.Id)
+            {
+                ResetForm();
+            }
+
+            Toasts.ShowSuccess($"کانال «{channel.Name}» حذف شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+}
