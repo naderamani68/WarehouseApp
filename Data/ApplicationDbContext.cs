@@ -183,7 +183,13 @@ namespace WarehouseApp.Data
                 new AppSetting { Key = "Company.EconomicCode", Value = "", Title = "کد اقتصادی", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 4, UpdatedAt = seedDate },
                 new AppSetting { Key = "Company.NationalId", Value = "", Title = "شناسهٔ ملی", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 5, UpdatedAt = seedDate },
                 new AppSetting { Key = "Sales.InvoicePrefix", Value = "SO", Title = "پیشوند شمارهٔ فاکتور", Group = "فروش", ValueType = "text", SortOrder = 1, Hint = "مثلاً SO که ابتدای شمارهٔ فاکتور می‌آید", UpdatedAt = seedDate },
-                new AppSetting { Key = "Sales.DefaultPaymentDays", Value = "0", Title = "مهلت پرداخت پیش‌فرض (روز)", Group = "فروش", ValueType = "number", SortOrder = 2, Hint = "برای ساخت خودکار تاریخ سررسید فاکتور", UpdatedAt = seedDate });
+                new AppSetting { Key = "Sales.DefaultPaymentDays", Value = "0", Title = "مهلت پرداخت پیش‌فرض (روز)", Group = "فروش", ValueType = "number", SortOrder = 2, Hint = "برای ساخت خودکار تاریخ سررسید فاکتور", UpdatedAt = seedDate },
+
+                // ===== پیامک =====
+                new AppSetting { Key = "Sms.Enabled", Value = "false", Title = "ارسال پیامک", Group = "پیامک", ValueType = "bool", SortOrder = 1, Hint = "تا خاموش باشد هیچ پیامکی فرستاده نمی‌شود", UpdatedAt = seedDate },
+                new AppSetting { Key = "Sms.ApiUrl", Value = "", Title = "نشانی پنل پیامک", Group = "پیامک", ValueType = "text", SortOrder = 2, Hint = "جانگهدارها: {apiKey} و {sender} و {receptor} و {message}", UpdatedAt = seedDate },
+                new AppSetting { Key = "Sms.ApiKey", Value = "", Title = "کلید پنل پیامک", Group = "پیامک", ValueType = "text", SortOrder = 3, UpdatedAt = seedDate },
+                new AppSetting { Key = "Sms.Sender", Value = "", Title = "شمارهٔ فرستنده", Group = "پیامک", ValueType = "text", SortOrder = 4, UpdatedAt = seedDate });
 
             // ===== نقش‌های پیش‌فرض =====
             modelBuilder.Entity<Role>().HasData(

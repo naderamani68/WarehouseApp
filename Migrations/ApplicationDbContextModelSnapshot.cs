@@ -171,6 +171,48 @@ namespace WarehouseApp.Migrations
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Value = "0",
                             ValueType = "number"
+                        },
+                        new
+                        {
+                            Key = "Sms.Enabled",
+                            Group = "پیامک",
+                            Hint = "تا خاموش باشد هیچ پیامکی فرستاده نمی‌شود",
+                            SortOrder = 1,
+                            Title = "ارسال پیامک",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "false",
+                            ValueType = "bool"
+                        },
+                        new
+                        {
+                            Key = "Sms.ApiUrl",
+                            Group = "پیامک",
+                            Hint = "جانگهدارها: {apiKey} و {sender} و {receptor} و {message}",
+                            SortOrder = 2,
+                            Title = "نشانی پنل پیامک",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Sms.ApiKey",
+                            Group = "پیامک",
+                            SortOrder = 3,
+                            Title = "کلید پنل پیامک",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Sms.Sender",
+                            Group = "پیامک",
+                            SortOrder = 4,
+                            Title = "شمارهٔ فرستنده",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
                         });
                 });
 

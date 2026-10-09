@@ -95,6 +95,11 @@
             ورود از اکسل
         </label>
         <InputFile id="productImportFile" OnChange="ImportProducts" accept=".xlsx,.xlsm" class="d-none" />
+        <label for="priceImportFile" class="btn btn-outline-success mb-0" title="ورود قیمت‌ها از فایل اکسل — ستون‌های کد و قیمت فروش و بهای خرید">
+            <span class="bi bi-cash-coin me-1" aria-hidden="true"></span>
+            ورود قیمت‌ها
+        </label>
+        <InputFile id="priceImportFile" OnChange="ImportPrices" accept=".xlsx,.xlsm" class="d-none" />
         <button class="btn btn-success" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
             @if (isExporting)
             {
@@ -911,6 +916,153 @@
             _ => ProductUnit.Number
         };
     }
+    /// <summary>
+    /// ورود دسته‌جمعی قیمت‌ها از فایل اکسل.
+    /// ستون‌های «کد» و «قیمت فروش» و «بهای خرید» شناخته می‌شوند؛
+    /// همین فایل خروجی خود برنامه را می‌توان ویرایش کرد و برگرداند.
+    /// </summary>
+    private async Task ImportPrices(InputFileChangeEventArgs e)
+    {
+        if (!Can(Permissions.ManageProducts))
+        {
+            Toasts.ShowError("شما اجازهٔ ویرایش کالا را ندارید");
+            return;
+        }
+
+        try
+        {
+            using var stream = e.File.OpenReadStream(20 * 1024 * 1024);
+            using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
+
+            var sheet = workbook.Worksheets.FirstOrDefault();
+
+            if (sheet is null)
+            {
+                Toasts.ShowError("فایل اکسل خالی است");
+                return;
+            }
+
+            var header = sheet.Row(1);
+            var codeColumn = 0;
+            var saleColumn = 0;
+            var costColumn = 0;
+
+            foreach (var cell in header.CellsUsed())
+            {
+                var text = cell.GetString().Trim();
+
+                if (codeColumn == 0 && text.Contains("کد"))
+                {
+                    codeColumn = cell.Address.ColumnNumber;
+                }
+                else if (saleColumn == 0 && text.Contains("فروش"))
+                {
+                    saleColumn = cell.Address.ColumnNumber;
+                }
+                else if (costColumn == 0 && (text.Contains("بها") || text.Contains("خرید")))
+                {
+                    costColumn = cell.Address.ColumnNumber;
+                }
+            }
+
+            if (codeColumn == 0 || (saleColumn == 0 && costColumn == 0))
+            {
+                Toasts.ShowError("ستون «کد» و یکی از ستون‌های «قیمت فروش» یا «بهای خرید» در فایل پیدا نشد");
+                return;
+            }
+
+            var updated = 0;
+            var missing = 0;
+
+            foreach (var row in sheet.RowsUsed().Skip(1))
+            {
+                var code = row.Cell(codeColumn).GetString().Trim();
+
+                if (string.IsNullOrWhiteSpace(code))
+                {
+                    continue;
+                }
+
+                var product = await Db.Products.FirstOrDefaultAsync(x => x.Code == code);
+
+                if (product is null && int.TryParse(code, out var id))
+                {
+                    product = await Db.Products.FirstOrDefaultAsync(x => x.Id == id && (x.Code == null || x.Code == ""));
+                }
+
+                if (product is null)
+                {
+                    missing++;
+                    continue;
+                }
+
+                var sale = saleColumn > 0 ? ReadPrice(row.Cell(saleColumn)) : null;
+                var cost = costColumn > 0 ? ReadPrice(row.Cell(costColumn)) : null;
+
+                if (sale is not null)
+                {
+                    product.SalePrice = sale.Value;
+                }
+
+                if (cost is not null)
+                {
+                    product.CostPrice = cost.Value;
+                }
+
+                updated++;
+            }
+
+            await Db.SaveChangesAsync();
+            await LoadProducts();
+
+            Toasts.ShowSuccess($"قیمت {updated} کالا به‌روزرسانی شد" + (missing > 0 ? $" — {missing} کد در سیستم پیدا نشد" : ""));
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خواندن فایل قیمت‌ها: {ex.Message}");
+        }
+    }
+
+    /// <summary>خواندن عدد از سلول اکسل — چه عددی باشد و چه متن با جداکنندهٔ هزار</summary>
+    private static decimal? ReadPrice(ClosedXML.Excel.IXLCell cell)
+    {
+        if (cell is null || cell.IsEmpty())
+        {
+            return null;
+        }
+
+        if (cell.DataType == ClosedXML.Excel.XLDataType.Number)
+        {
+            return cell.GetValue<decimal>();
+        }
+
+        var builder = new System.Text.StringBuilder();
+
+        foreach (var ch in cell.GetString())
+        {
+            if (ch is >= '0' and <= '9')
+            {
+                builder.Append(ch);
+            }
+            else if (ch is >= '۰' and <= '۹')
+            {
+                builder.Append((char)('0' + (ch - '۰')));
+            }
+            else if (ch == '.')
+            {
+                builder.Append('.');
+            }
+        }
+
+        return decimal.TryParse(
+            builder.ToString(),
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : null;
+    }
+
     private async Task ExportExcel()
     {
         if (!Can(Permissions.ExportExcel))
