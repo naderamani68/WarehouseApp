@@ -39,3 +39,6 @@ Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+
+# آپلودهای کاربران — عکس کالاها
+wwwroot/uploads/

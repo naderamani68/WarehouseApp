@@ -225,7 +225,13 @@ else
                                     <i class="bi @(expanded.Contains(order.Id) ? "bi-chevron-up" : "bi-chevron-down")"></i>
                                 </button>
                             </td>
-                            <td class="fw-bold" dir="ltr">@order.OrderNumber</td>
+                            <td class="fw-bold" dir="ltr">
+                                @order.OrderNumber
+                                @if (order.Source == OrderSource.Shop)
+                                {
+                                    <span class="badge bg-info text-dark ms-1">فروشگاه</span>
+                                }
+                            </td>
                             <td><a href="@($"crm/parties/{order.PartyId}")">@(order.Party?.Name ?? "—")</a></td>
                             <td class="small">@(order.Warehouse?.Name ?? "—")</td>
                             <td class="small" dir="ltr">@PersianDate.ToDate(order.OrderDate)</td>

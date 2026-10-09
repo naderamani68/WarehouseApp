@@ -74,7 +74,7 @@
                         <div class="small text-muted">واحد: @product.UnitTitle</div>
 
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="shop-price">@Money(product.Price) ریال</span>
+                            <span class="shop-price">@(product.Price > 0 ? Money(product.Price) + " ریال" : "تماس بگیرید")</span>
 
                             @if (product.InStock)
                             {

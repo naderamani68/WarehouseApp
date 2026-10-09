@@ -26,7 +26,7 @@
         {
             <div class="col-md-3 col-sm-6">
                 <div class="card shortcut-card h-100 text-center"
-                     @onclick="() => Nav.NavigateTo(card.Url)">
+                     @onclick="() => OpenCard(card)">
                     <div class="card-body">
                         <div class="shortcut-icon">@card.Icon</div>
                         <h5 class="card-title mt-2">@card.Title</h5>
@@ -36,6 +36,15 @@
             </div>
         }
     </div>
+
+    @* ===== هشدار سفارش‌های در انتظار تأیید ===== *@
+    @if (pendingOrders > 0)
+    {
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>🧾 تعداد @pendingOrders سفارش فروش در انتظار تأیید است.</span>
+            <a class="btn btn-sm btn-warning" href="crm/orders">بررسی سفارش‌ها</a>
+        </div>
+    }
 
     @* ===== نمودار Top 5 محصول (CSS) - کشویی ===== *@
     <div class="inventory-section mt-5">
@@ -330,6 +339,9 @@
         public string Title { get; set; } = "";
         public string Description { get; set; } = "";
         public string Url { get; set; } = "";
+
+        /// <summary>باز شدن در زبانهٔ تازه</summary>
+        public bool NewTab { get; set; }
     }
 
     private List<ShortcutCard> Shortcuts => new()
@@ -338,7 +350,23 @@
         new() { Icon = "🏢", Title = "انبارها",      Description = "مدیریت انبارها", Url = "warehouses" },
         new() { Icon = "🔄", Title = "حرکات انبار", Description = "ورود و خروج",    Url = "movements"  },
         new() { Icon = "📊", Title = "گزارش‌ها",     Description = "آمار و تحلیل",   Url = "reports"    },
+
+        // ===== میانبرهای فروشگاه =====
+        new() { Icon = "🛒", Title = "فروشگاه اینترنتی", Description = "دیدن سایت فروش", Url = "/shop", NewTab = true },
+        new() { Icon = "🧾", Title = "سفارش‌های فروش",   Description = "تأیید و پیگیری", Url = "crm/orders" },
     };
+
+    // ===== باز کردن میانبر: فروشگاه در زبانهٔ تازه، بقیه در همین صفحه =====
+    private async Task OpenCard(ShortcutCard card)
+    {
+        if (card.NewTab)
+        {
+            await JS.InvokeVoidAsync("open", card.Url, "_blank");
+            return;
+        }
+
+        Nav.NavigateTo(card.Url);
+    }
 
     // ===== مدل داخلی جدول موجودی =====
     private class InventoryItem
@@ -365,6 +393,9 @@
     private bool showChart = false;
     private bool isExporting = false;
 
+    /// <summary>سفارش‌های فروش در انتظار تأیید</summary>
+    private int pendingOrders;
+
     // ===== فیلترها =====
     private string? productSearch;
     private string? warehouseFilter;
@@ -386,6 +417,8 @@
     {
         await LoadInventoryAsync();
         await LoadTopProductsAsync();
+
+        pendingOrders = await Db.SalesOrders.CountAsync(o => o.Status == OrderStatus.Draft);
     }
 
     // ===== بارگذاری موجودی از StockMovements =====
