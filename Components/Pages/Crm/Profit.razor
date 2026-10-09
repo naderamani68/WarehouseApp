@@ -1,0 +1,387 @@
+﻿@page "/crm/profit"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+@* گزارش سود — فروش در برابر بهای تمام‌شده، هم به تفکیک کالا و هم به تفکیک کانال فروش *@
+
+<PageTitle>گزارش سود | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">💰 گزارش سود</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">از تاریخ</label>
+                <PersianDateInput @bind-Value="fromDate" @bind-Value:after="LoadAsync" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تا تاریخ</label>
+                <PersianDateInput @bind-Value="toDate" @bind-Value:after="LoadAsync" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">نمایش</label>
+                <select class="form-select" @bind="mode">
+                    <option value="product">به تفکیک کالا</option>
+                    <option value="channel">به تفکیک کانال فروش</option>
+                </select>
+            </div>
+            <div class="col-md-3 text-end">
+                <button class="btn btn-success w-100" @onclick="ExportAsync" disabled="@(!CanExport || isExporting || busy)">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-excel"></i>
+                        <span>خروجی Excel</span>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetRangeAsync(7)">۷ روز گذشته</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetRangeAsync(30)">۳۰ روز گذشته</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetRangeAsync(90)">۹۰ روز گذشته</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => SetRangeAsync(0)">از ابتدا تا امروز</button>
+
+            @if (busy)
+            {
+                <span class="text-muted small align-self-center">در حال محاسبه…</span>
+            }
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">فروش کل</div>
+                <div class="fs-5 fw-bold">@Money(totalRevenue)</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">بهای تمام‌شده</div>
+                <div class="fs-5 fw-bold">@Money(totalCost)</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">سود ناخالص</div>
+                <div class="fs-5 fw-bold @(totalProfit < 0 ? "text-danger" : "text-success")">@Money(totalProfit)</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">حاشیهٔ سود</div>
+                <div class="fs-5 fw-bold">@Margin(totalRevenue, totalProfit)</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">سفارش تأییدشده</div>
+                <div class="fs-5 fw-bold">@orderCount.ToString("N0", Fa)</div>
+                <div class="text-muted small">@lineCount.ToString("N0", Fa) قلم کالا</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">سودآورترین</div>
+                <div class="fs-6 fw-bold">@(topName.Length == 0 ? "—" : topName)</div>
+                <div class="text-muted small">@(topName.Length == 0 ? "" : Money(topProfit))</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>@(mode == "product" ? "کالا" : "کانال فروش")</th>
+                        <th style="width:110px">تعداد</th>
+                        <th style="width:160px">فروش</th>
+                        <th style="width:160px">بهای تمام‌شده</th>
+                        <th style="width:160px">سود</th>
+                        <th style="width:100px">حاشیه</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (CurrentRows.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">در این بازه فروش تأییدشده‌ای ثبت نشده است.</td>
+                        </tr>
+                    }
+                    @foreach (var row in CurrentRows)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@row.Name</td>
+                            <td>@row.Quantity.ToString("N0", Fa)</td>
+                            <td>@Money(row.Revenue)</td>
+                            <td class="text-muted">@Money(row.Cost)</td>
+                            <td class="fw-bold @(row.Profit < 0 ? "text-danger" : "text-success")">@Money(row.Profit)</td>
+                            <td class="@(row.Profit < 0 ? "text-danger" : "")">@Margin(row.Revenue, row.Profit)</td>
+                        </tr>
+                    }
+                </tbody>
+                @if (CurrentRows.Count > 0)
+                {
+                    <tfoot>
+                        <tr class="table-light">
+                            <td class="fw-bold">جمع کل</td>
+                            <td class="fw-bold">@totalQuantity.ToString("N0", Fa)</td>
+                            <td class="fw-bold">@Money(totalRevenue)</td>
+                            <td class="fw-bold">@Money(totalCost)</td>
+                            <td class="fw-bold @(totalProfit < 0 ? "text-danger" : "text-success")">@Money(totalProfit)</td>
+                            <td class="fw-bold">@Margin(totalRevenue, totalProfit)</td>
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-3 small mb-0">
+        بهای تمام‌شده بر پایهٔ «بهای خرید» ثبت‌شده در شناسنامهٔ کالا محاسبه می‌شود. اگر بهای خرید کالایی صفر باشد،
+        سود آن کالا بیشتر از واقعیت نمایش داده می‌شود. برای دقت بیشتر، بهای خرید کالاها را در صفحهٔ کالاها کامل کن.
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanExport;
+    private bool busy;
+    private bool isExporting;
+
+    private DateTime? fromDate = DateTime.Today.AddDays(-29);
+    private DateTime? toDate = DateTime.Today;
+
+    private string mode = "product";
+
+    private List<ProfitRow> productRows = new();
+    private List<ProfitRow> channelRows = new();
+
+    private decimal totalRevenue;
+    private decimal totalCost;
+    private decimal totalProfit;
+    private decimal totalQuantity;
+    private int orderCount;
+    private int lineCount;
+
+    private List<ProfitRow> CurrentRows => mode == "channel" ? channelRows : productRows;
+
+    private string topName => CurrentRows.Count == 0 ? string.Empty : CurrentRows.MaxBy(r => r.Profit)!.Name;
+
+    private decimal topProfit => CurrentRows.Count == 0 ? 0m : CurrentRows.Max(r => r.Profit);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewCrm);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            busy = true;
+
+            var query = Db.SalesOrders
+                .AsNoTracking()
+                .Include(o => o.Channel)
+                .Include(o => o.Items).ThenInclude(i => i.Product)
+                .Where(o => o.Status == OrderStatus.Confirmed);
+
+            if (fromDate.HasValue)
+            {
+                var from = fromDate.Value.Date;
+                query = query.Where(o => o.OrderDate >= from);
+            }
+
+            if (toDate.HasValue)
+            {
+                var until = toDate.Value.Date.AddDays(1);
+                query = query.Where(o => o.OrderDate < until);
+            }
+
+            var orders = await query.ToListAsync();
+
+            orderCount = orders.Count;
+
+            var lines = orders
+                .SelectMany(o => o.Items.Select(i => new { Order = o, Item = i }))
+                .ToList();
+
+            lineCount = lines.Count;
+
+            productRows = lines
+                .GroupBy(x => x.Item.ProductId)
+                .Select(g =>
+                {
+                    var first = g.First();
+                    var revenue = g.Sum(x => x.Item.LineTotal);
+                    var cost = g.Sum(x => CostOf(x.Item));
+                    return new ProfitRow(first.Item.Product?.Name ?? "کالای حذف‌شده", g.Sum(x => Amount(x.Item)), revenue, cost, revenue - cost);
+                })
+                .OrderByDescending(r => r.Profit)
+                .ToList();
+
+            channelRows = lines
+                .GroupBy(x => x.Order.Channel?.Name ?? "نامشخص")
+                .Select(g =>
+                {
+                    var revenue = g.Sum(x => x.Item.LineTotal);
+                    var cost = g.Sum(x => CostOf(x.Item));
+                    return new ProfitRow(g.Key, g.Sum(x => Amount(x.Item)), revenue, cost, revenue - cost);
+                })
+                .OrderByDescending(r => r.Profit)
+                .ToList();
+
+            totalRevenue = productRows.Sum(r => r.Revenue);
+            totalCost = productRows.Sum(r => r.Cost);
+            totalProfit = totalRevenue - totalCost;
+            totalQuantity = productRows.Sum(r => r.Quantity);
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در محاسبهٔ سود: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    /// <summary>تعداد یک قلم سفارش به عدد اعشاری — برای کالاهای وزنی مثل کیلو</summary>
+    private static decimal Amount(SalesOrderItem item) => (decimal)item.Quantity;
+
+    /// <summary>بهای تمام‌شدهٔ یک قلم = تعداد × بهای خرید ثبت‌شدهٔ کالا</summary>
+    private static decimal CostOf(SalesOrderItem item) => (decimal)item.Quantity * (item.Product?.CostPrice ?? 0m);
+
+    private async Task SetRangeAsync(int days)
+    {
+        if (days <= 0)
+        {
+            fromDate = null;
+            toDate = DateTime.Today;
+        }
+        else
+        {
+            fromDate = DateTime.Today.AddDays(-(days - 1));
+            toDate = DateTime.Today;
+        }
+
+        await LoadAsync();
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private static string Margin(decimal revenue, decimal profit)
+        => revenue <= 0 ? "—" : (profit / revenue * 100m).ToString("N1", Fa) + "٪";
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        if (CurrentRows.Count == 0)
+        {
+            Toasts.ShowError("برای خروجی، اول بازه‌ای با فروش تأییدشده انتخاب کن");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var rows = CurrentRows
+                .Select(r => new ExportRow(
+                    r.Name,
+                    r.Quantity.ToString("N0", Fa),
+                    r.Revenue.ToString("N0", Fa),
+                    r.Cost.ToString("N0", Fa),
+                    r.Profit.ToString("N0", Fa),
+                    Margin(r.Revenue, r.Profit)))
+                .ToList();
+
+            rows.Add(new ExportRow(
+                "جمع کل",
+                totalQuantity.ToString("N0", Fa),
+                totalRevenue.ToString("N0", Fa),
+                totalCost.ToString("N0", Fa),
+                totalProfit.ToString("N0", Fa),
+                Margin(totalRevenue, totalProfit)));
+
+            var columns = new Dictionary<string, Func<ExportRow, object?>>
+            {
+                [mode == "channel" ? "کانال فروش" : "کالا"] = r => r.Name,
+                ["تعداد"] = r => r.Quantity,
+                ["فروش"] = r => r.Revenue,
+                ["بهای تمام‌شده"] = r => r.Cost,
+                ["سود"] = r => r.Profit,
+                ["حاشیه"] = r => r.Margin
+            };
+
+            var now = DateTime.Now;
+            var fromTitle = fromDate.HasValue ? PersianDate.ToDate(fromDate.Value) : "ابتدا";
+            var toTitle = toDate.HasValue ? PersianDate.ToDate(toDate.Value) : "امروز";
+            var modeTitle = mode == "channel" ? "کانال" : "کالا";
+            var title = $"گزارش سود ({modeTitle})  |  از {fromTitle} تا {toTitle}";
+
+            var bytes = Excel.Export(rows, "گزارش سود", columns, title);
+            var fileName = $"Profit_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {rows.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+
+    private record ProfitRow(string Name, decimal Quantity, decimal Revenue, decimal Cost, decimal Profit);
+
+    private record ExportRow(string Name, string Quantity, string Revenue, string Cost, string Profit, string Margin);
+}
