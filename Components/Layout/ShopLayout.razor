@@ -1,0 +1,35 @@
+﻿@inherits LayoutComponentBase
+
+@* چیدمان فروشگاه — کاملاً جدا از چیدمان پنل انبار.
+   منوی مدیریت، نام کارمندان و اطلاعات داخلی در این چیدمان وجود ندارد. *@
+
+<div class="shop-page">
+
+    <header class="shop-header">
+        <div class="container d-flex justify-content-between align-items-center">
+            <a class="shop-brand" href="/shop">
+                <span class="bi bi-shop" aria-hidden="true"></span>
+                فروشگاه
+            </a>
+
+            <div class="d-flex align-items-center gap-3">
+                <span class="shop-link disabled" title="در قدم‌های بعدی ساخته می‌شود">
+                    <span class="bi bi-cart3 me-1" aria-hidden="true"></span>
+                    سبد خرید — به‌زودی
+                </span>
+                <a class="shop-link" href="/">ورود کارمندان</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="shop-main">
+        @Body
+    </main>
+
+    <footer class="shop-footer">
+        <div class="container text-center small">
+            برای ثبت سفارش فقط نام، تلفن و نشانی لازم است — بدون نیاز به ثبت‌نام
+        </div>
+    </footer>
+
+</div>

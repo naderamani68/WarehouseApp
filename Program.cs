@@ -30,6 +30,7 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
 
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<ShopCatalogService>();
 
 // ===== احراز هویت با کوکی =====
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -97,9 +98,33 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 }
             }
         };
+    })
+    // ===== کوکی جداگانهٔ مشتریان فروشگاه =====
+    // مسیر کوکی روی «/shop» محدود است، پس مرورگر آن را به پنل انبار نمی‌فرستد.
+    // نتیجه: حتی اگر یک ایراد امنیتی در فروشگاه پیدا شود، نشست کارمندان در خطر نیست.
+    .AddCookie(ShopAuth.Scheme, options =>
+    {
+        options.LoginPath = "/shop/account/login";
+        options.LogoutPath = "/shop/account/logout";
+        options.AccessDeniedPath = "/shop";
+        options.Cookie.Name = "WarehouseApp.Shop";
+        options.Cookie.Path = "/shop";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // سیاست مخصوص مشتریان فروشگاه؛ با طرح ورود جداگانه کار می‌کند
+    options.AddPolicy(ShopAuth.CustomerPolicy, policy =>
+    {
+        policy.AddAuthenticationSchemes(ShopAuth.Scheme);
+        policy.RequireAuthenticatedUser();
+    });
+});
 builder.Services.AddCascadingAuthenticationState();
 
 // ===== سرویس احراز هویت =====
@@ -121,6 +146,20 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+
+// ===== سرصفحه‌های امنیتی =====
+// جلوی حدس‌زدن نوع فایل، قاب‌گرفتن سایت در صفحهٔ دیگران و ارسال نشانی صفحه به سایت‌های بیرونی را می‌گیرد.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "SAMEORIGIN";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()";
+
+    await next();
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
