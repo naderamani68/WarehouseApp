@@ -1,5 +1,7 @@
 ﻿@inject IHttpContextAccessor HttpAccessor
 @inject AccessService Access
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.Components.Routing
 @using WarehouseApp.Services
 @using WarehouseApp.Data
 
@@ -14,170 +16,47 @@
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="flex-column">
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill me-2" aria-hidden="true"></span>
-                خانه
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="profile">
-                <span class="bi bi-person-circle me-2" aria-hidden="true"></span>
-                پروفایل من
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="products">
-                <span class="bi bi-box-seam me-2" aria-hidden="true"></span>
-                محصولات
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="categories">
-                <span class="bi bi-tags-fill me-2" aria-hidden="true"></span>
-                دسته‌بندی‌ها
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="warehouses">
-                <span class="bi bi-building me-2" aria-hidden="true"></span>
-                انبارها
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="movements">
-                <span class="bi bi-arrow-left-right me-2" aria-hidden="true"></span>
-                حرکات انبار
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="reports">
-                <span class="bi bi-bar-chart-fill me-2" aria-hidden="true"></span>
-                گزارش‌ها
-            </NavLink>
-        </div>
-
-        @* ===== بخش مشتریان، فروش و پیگیری (CRM) ===== *@
-        @if (canViewCrm)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="crm" Match="NavLinkMatch.All">
-                    <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span>
-                    داشبورد فروش
-                </NavLink>
-            </div>
+        @{
+            var visibleSections = sections.Where(s => s.Items.Count > 0).ToList();
         }
 
-        @if (canViewParties)
+        @for (var i = 0; i < visibleSections.Count; i++)
         {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="crm/parties">
-                    <span class="bi bi-people me-2" aria-hidden="true"></span>
-                    مشتریان و تأمین‌کنندگان
-                </NavLink>
-            </div>
-        }
+            var grp = visibleSections[i];
+            var isOpen = IsOpen(grp.Key);
+            var isActive = ActiveSectionKey == grp.Key;
 
-        @if (canViewCrm)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="crm/interactions">
-                    <span class="bi bi-telephone-outbound me-2" aria-hidden="true"></span>
-                    پیگیری‌ها
-                </NavLink>
-            </div>
+            @if (i > 0)
+            {
+                <hr class="mx-3 my-1 opacity-25" />
+            }
 
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="crm/opportunities">
-                    <span class="bi bi-graph-up-arrow me-2" aria-hidden="true"></span>
-                    فرصت‌های فروش
-                </NavLink>
-            </div>
+            <div class="nav-group">
+                <button type="button"
+                        class="nav-link w-100 d-flex justify-content-between align-items-center border-0 bg-transparent text-start @(isActive ? "fw-bold" : "")"
+                        aria-expanded="@(isOpen ? "true" : "false")"
+                        @onclick="() => Toggle(grp.Key)"
+                        @onclick:stopPropagation="true">
+                    <span class="d-flex align-items-center">
+                        <span class="bi @grp.Icon me-2" aria-hidden="true"></span>
+                        <span>@grp.Title</span>
+                    </span>
+                    <span class="bi @(isOpen ? "bi-chevron-up" : "bi-chevron-down") small" aria-hidden="true"></span>
+                </button>
 
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="crm/orders">
-                    <span class="bi bi-receipt me-2" aria-hidden="true"></span>
-                    سفارش‌های فروش
-                </NavLink>
-            </div>
-        }
-
-        @* ===== بخش مالی ===== *@
-        @if (canViewFinance)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="finance" Match="NavLinkMatch.All">
-                    <span class="bi bi-cash-coin me-2" aria-hidden="true"></span>
-                    وضعیت مالی
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="finance/cheques">
-                    <span class="bi bi-journal-check me-2" aria-hidden="true"></span>
-                    چک و سفته
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="finance/debts">
-                    <span class="bi bi-arrow-left-right me-2" aria-hidden="true"></span>
-                    بدهی و طلب
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="finance/expenses">
-                    <span class="bi bi-wallet2 me-2" aria-hidden="true"></span>
-                    هزینه‌ها
-                </NavLink>
-            </div>
-        }
-
-        @* ===== آیتم‌های مدیریتی (بر اساس اختیار کاربر) ===== *@
-        @if (canManageEmployees)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="employees">
-                    <span class="bi bi-people-fill me-2" aria-hidden="true"></span>
-                    کارمندان
-                </NavLink>
-            </div>
-        }
-
-        @if (canViewAuditLog)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="audit-log">
-                    <span class="bi bi-clock-history me-2" aria-hidden="true"></span>
-                    تاریخچهٔ عملیات
-                </NavLink>
-            </div>
-        }
-
-        @if (canManageRoles)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="roles">
-                    <span class="bi bi-shield-lock-fill me-2" aria-hidden="true"></span>
-                    نقش‌ها و دسترسی‌ها
-                </NavLink>
-            </div>
-        }
-
-        @if (canManageSettings)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="settings">
-                    <span class="bi bi-sliders me-2" aria-hidden="true"></span>
-                    تنظیمات
-                </NavLink>
+                @if (isOpen)
+                {
+                    @foreach (var item in grp.Items)
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="@item.Href"
+                                     Match="@(item.Exact ? NavLinkMatch.All : NavLinkMatch.Prefix)">
+                                <span class="bi @item.Icon me-2" aria-hidden="true"></span>
+                                @item.Title
+                            </NavLink>
+                        </div>
+                    }
+                }
             </div>
         }
 
@@ -185,6 +64,12 @@
 </div>
 
 @code {
+    /// <summary>یک آیتم منو</summary>
+    private record NavItem(string Title, string Href, string Icon, bool Exact = false);
+
+    /// <summary>یک دستهٔ منو همراه آیتم‌هایش</summary>
+    private record NavSection(string Key, string Title, string Icon, List<NavItem> Items);
+
     private bool canManageRoles;
     private bool canManageEmployees;
     private bool canViewAuditLog;
@@ -192,6 +77,26 @@
     private bool canViewCrm;
     private bool canViewFinance;
     private bool canManageSettings;
+
+    /// <summary>دسته‌هایی که کاربر بسته است — پیش‌فرض همه باز هستند</summary>
+    private readonly HashSet<string> collapsed = new();
+
+    private List<NavSection> sections = new();
+
+    /// <summary>دستهٔ مربوط به صفحهٔ فعلی — برای پررنگ کردن عنوان آن</summary>
+    private string? ActiveSectionKey
+    {
+        get
+        {
+            var path = new Uri(Nav.Uri).AbsolutePath.Trim('/');
+
+            var found = sections.FirstOrDefault(s => s.Items.Any(item =>
+                !string.IsNullOrEmpty(item.Href) &&
+                path.StartsWith(item.Href, StringComparison.OrdinalIgnoreCase)));
+
+            return found?.Key;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -205,5 +110,96 @@
         canViewCrm = (permissions & Permissions.ViewCrm) == Permissions.ViewCrm;
         canViewFinance = (permissions & Permissions.ViewFinance) == Permissions.ViewFinance;
         canManageSettings = (permissions & Permissions.ManageSettings) == Permissions.ManageSettings;
+
+        BuildSections();
+    }
+
+    /// <summary>ساخت دسته‌های منو — هر بخش فقط اگر حداقل یک آیتم مجاز داشته باشد نمایش داده می‌شود</summary>
+    private void BuildSections()
+    {
+        var general = new List<NavItem>
+        {
+            new("خانه", "", "bi-house-door-fill", Exact: true),
+            new("پروفایل من", "profile", "bi-person-circle")
+        };
+
+        var warehouse = new List<NavItem>
+        {
+            new("کالاها", "products", "bi-box-seam"),
+            new("دسته‌بندی‌ها", "categories", "bi-tags-fill"),
+            new("انبارها", "warehouses", "bi-building"),
+            new("حرکات انبار", "movements", "bi-arrow-left-right"),
+            new("گزارش‌ها", "reports", "bi-bar-chart-fill")
+        };
+
+        var sales = new List<NavItem>();
+
+        if (canViewCrm)
+        {
+            sales.Add(new NavItem("داشبورد فروش", "crm", "bi-speedometer2", Exact: true));
+        }
+
+        if (canViewParties)
+        {
+            sales.Add(new NavItem("مشتریان و تأمین‌کنندگان", "crm/parties", "bi-people"));
+        }
+
+        if (canViewCrm)
+        {
+            sales.Add(new NavItem("پیگیری‌ها", "crm/interactions", "bi-telephone-outbound"));
+            sales.Add(new NavItem("فرصت‌های فروش", "crm/opportunities", "bi-graph-up-arrow"));
+            sales.Add(new NavItem("سفارش‌های فروش", "crm/orders", "bi-receipt"));
+        }
+
+        var finance = new List<NavItem>();
+
+        if (canViewFinance)
+        {
+            finance.Add(new NavItem("وضعیت مالی", "finance", "bi-cash-coin", Exact: true));
+            finance.Add(new NavItem("چک و سفته", "finance/cheques", "bi-journal-check"));
+            finance.Add(new NavItem("بدهی و طلب", "finance/debts", "bi-arrow-left-right"));
+            finance.Add(new NavItem("هزینه‌ها", "finance/expenses", "bi-wallet2"));
+        }
+
+        var admin = new List<NavItem>();
+
+        if (canManageEmployees)
+        {
+            admin.Add(new NavItem("کارمندان", "employees", "bi-people-fill"));
+        }
+
+        if (canManageRoles)
+        {
+            admin.Add(new NavItem("نقش‌ها و دسترسی‌ها", "roles", "bi-shield-lock-fill"));
+        }
+
+        if (canViewAuditLog)
+        {
+            admin.Add(new NavItem("تاریخچهٔ عملیات", "audit-log", "bi-clock-history"));
+        }
+
+        if (canManageSettings)
+        {
+            admin.Add(new NavItem("تنظیمات", "settings", "bi-sliders"));
+        }
+
+        sections = new List<NavSection>
+        {
+            new("general", "عمومی", "bi-grid-1x2", general),
+            new("warehouse", "انبار و کالا", "bi-box-seam", warehouse),
+            new("sales", "فروش و پیگیری", "bi-graph-up-arrow", sales),
+            new("finance", "مالی و حسابداری", "bi-cash-stack", finance),
+            new("admin", "مدیریت سیستم", "bi-gear", admin)
+        };
+    }
+
+    private bool IsOpen(string key) => !collapsed.Contains(key);
+
+    private void Toggle(string key)
+    {
+        if (!collapsed.Add(key))
+        {
+            collapsed.Remove(key);
+        }
     }
 }
