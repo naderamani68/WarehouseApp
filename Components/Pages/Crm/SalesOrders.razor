@@ -47,6 +47,14 @@ else
                         <option value="@p.Id">@p.Name</option>
                     }
                 </select>
+
+                @if (editing is null || editing.Status == OrderStatus.Draft)
+                {
+                    <button class="btn btn-sm btn-link p-0 mt-1" @onclick="() => showQuickCustomer = !showQuickCustomer">
+                        <i class="bi bi-person-plus"></i>
+                        مشتری تازه
+                    </button>
+                }
             </div>
             <div class="col-md-3">
                 <label class="form-label">انبار خروج</label>
@@ -76,6 +84,42 @@ else
                 <label class="form-label">شمارهٔ سفارش</label>
                 <input class="form-control" dir="ltr" value="@(editing?.OrderNumber ?? nextNumber)" readonly />
             </div>
+
+            @if (showQuickCustomer && (editing is null || editing.Status == OrderStatus.Draft))
+            {
+                <div class="col-12">
+                    <div class="border rounded p-3 bg-light">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-semibold">مشتری تازه — بدون رفتن به صفحهٔ مشتریان</span>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => showQuickCustomer = false">بستن</button>
+                        </div>
+
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">نام مشتری</label>
+                                <input class="form-control" @bind="quickName" placeholder="مثلاً: علی رضایی" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">تلفن همراه</label>
+                                <input class="form-control" dir="ltr" @bind="quickMobile" placeholder="09123456789" />
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100" @onclick="CreateQuickCustomerAsync" disabled="@quickBusy">
+                                    @if (quickBusy)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                    }
+                                    ثبت و انتخاب مشتری
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-muted small mt-2">
+                            اگر این شماره از قبل ثبت شده باشد، همان مشتری انتخاب می‌شود و مشتری تکراری ساخته نمی‌شود.
+                        </div>
+                    </div>
+                </div>
+            }
 
             <div class="col-12">
                 <label class="form-label">یادداشت</label>
@@ -392,6 +436,11 @@ else
     private string nextNumber = string.Empty;
     private List<LineDraft> lines = new();
 
+    private bool showQuickCustomer;
+    private bool quickBusy;
+    private string? quickName;
+    private string? quickMobile;
+
     private bool busy;
     private bool isExporting;
     private string? currentUsername;
@@ -638,6 +687,9 @@ else
         formChannelId = 0;
         formDate = DateTime.Today;
         formNotes = null;
+        showQuickCustomer = false;
+        quickName = null;
+        quickMobile = null;
         lines = new List<LineDraft>();
         AddLine();
         nextNumber = await CrmService.NextOrderNumberAsync(Db);
@@ -646,6 +698,77 @@ else
     private void ResetForm()
     {
         _ = ResetFormAsync();
+    }
+
+    /// <summary>
+    /// ثبت سریع مشتری از داخل فرم سفارش — برای فروش دیوار، اینستاگرام و حضوری
+    /// که نمی‌خواهیم اول به صفحهٔ مشتریان برویم.
+    /// اگر شماره از قبل باشد، همان مشتری انتخاب می‌شود.
+    /// </summary>
+    private async Task CreateQuickCustomerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(quickName) || quickName.Trim().Length < 3)
+        {
+            Toasts.ShowError("نام مشتری را کامل بنویسید");
+            return;
+        }
+
+        var mobile = WarehouseApp.Services.ShopCatalogService.NormalizePhone(quickMobile);
+
+        if (mobile.Length < 10)
+        {
+            Toasts.ShowError("شمارهٔ همراه معتبر نیست — مثل 09123456789");
+            return;
+        }
+
+        try
+        {
+            quickBusy = true;
+
+            var existing = await Db.Parties
+                .FirstOrDefaultAsync(p => p.Mobile == mobile || p.Phone == mobile);
+
+            if (existing is not null)
+            {
+                formPartyId = existing.Id;
+                showQuickCustomer = false;
+                quickName = null;
+                quickMobile = null;
+                Toasts.ShowSuccess($"مشتری «{existing.Name}» از قبل ثبت بود و انتخاب شد");
+                return;
+            }
+
+            var party = new Party
+            {
+                Name = quickName.Trim(),
+                Mobile = mobile,
+                Type = PartyType.Customer,
+                IsActive = true,
+                Code = "CU-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()
+            };
+
+            Db.Parties.Add(party);
+            await Db.SaveChangesAsync();
+
+            customers.Add(party);
+            formPartyId = party.Id;
+
+            await AuditAsync("افزودن", "طرف حساب", party.Id, $"مشتری «{party.Name}» از فرم سفارش فروش ثبت شد");
+
+            quickName = null;
+            quickMobile = null;
+            showQuickCustomer = false;
+
+            Toasts.ShowSuccess($"مشتری «{party.Name}» ثبت و انتخاب شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ثبت مشتری: {ex.Message}");
+        }
+        finally
+        {
+            quickBusy = false;
+        }
     }
 
     private async Task ConfirmOrderAsync(SalesOrder order)
