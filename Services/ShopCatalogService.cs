@@ -42,11 +42,16 @@ public class ShopCatalogService
             query = query.Where(p => p.CategoryId == categoryId);
         }
 
-        return await Project(query)
-            .OrderByDescending(p => p.InStock)
+        // نکته: ترتیبدهی باید روی ستون‌های واقعی جدول انجام شود، نه روی ویژگی‌های
+        // محاسباتی مدل سبک؛ وگرنه موتور پایگاه داده نمی‌تواند آن را ترجمه کند.
+        var rows = await query
+            .Include(p => p.Category)
+            .OrderByDescending(p => p.Quantity > 0)
             .ThenBy(p => p.Name)
             .Take(take)
             .ToListAsync();
+
+        return rows.Select(Map).ToList();
     }
 
     /// <summary>یک کالا برای صفحهٔ جزئیات</summary>
@@ -54,8 +59,12 @@ public class ShopCatalogService
     {
         await using var db = await _factory.CreateDbContextAsync();
 
-        return await Project(db.Products.AsNoTracking().Where(p => p.IsActive && p.Id == id))
-            .FirstOrDefaultAsync();
+        var product = await db.Products
+            .AsNoTracking()
+            .Include(p => p.Category)
+            .FirstOrDefaultAsync(p => p.IsActive && p.Id == id);
+
+        return product is null ? null : Map(product);
     }
 
     /// <summary>چند کالا با شناسه — برای سبد خرید</summary>
@@ -70,8 +79,13 @@ public class ShopCatalogService
 
         await using var db = await _factory.CreateDbContextAsync();
 
-        return await Project(db.Products.AsNoTracking().Where(p => p.IsActive && wanted.Contains(p.Id)))
+        var rows = await db.Products
+            .AsNoTracking()
+            .Include(p => p.Category)
+            .Where(p => p.IsActive && wanted.Contains(p.Id))
             .ToListAsync();
+
+        return rows.Select(Map).ToList();
     }
 
     /// <summary>فهرست دسته‌هایی که حداقل یک کالای فعال دارند</summary>
@@ -162,20 +176,20 @@ public class ShopCatalogService
         return digits.Length > 10 ? digits[^10..] : digits;
     }
 
-    /// <summary>تبدیل پرس‌وجو به مدل سبک فروشگاه</summary>
-    private static IQueryable<ShopProductDto> Project(IQueryable<Product> query)
+    /// <summary>تبدیل کالا به مدل سبک فروشگاه — بعد از خواندن از پایگاه داده و در حافظه</summary>
+    private static ShopProductDto Map(Product p)
     {
-        return query.Select(p => new ShopProductDto(
+        return new ShopProductDto(
             p.Id,
             p.Name ?? "کالای بی‌نام",
             p.Code,
-            p.Category != null ? p.Category.Name : null,
+            p.Category?.Name,
             p.Unit,
             p.SalePrice,
             p.Quantity > 0,
             p.Quantity,
             p.ImagePath,
-            p.Description));
+            p.Description);
     }
 }
 
