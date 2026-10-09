@@ -35,6 +35,8 @@ public class Product
     /// <summary>بارکد کالا (اختیاری — برای آینده و دستگاه بارکدخوان)</summary>
     [MaxLength(50)]
     public string? Barcode { get; set; }
+    /// <summary>مسیر نسبی عکس کالا در پوشهٔ wwwroot — برای نمایش در فروشگاه</summary>
+    public string? ImagePath { get; set; }
 
     [MaxLength(500)]
     public string? Description { get; set; }

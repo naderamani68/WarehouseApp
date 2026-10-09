@@ -3,6 +3,7 @@
 @using System.Globalization
 @using WarehouseApp.Services
 @inject ShopCatalogService Catalog
+@inject IHttpContextAccessor Http
 
 @* این صفحه عمداً بدون حالت تعاملی رندر می‌شود:
    بازدیدکنندهٔ ناشناس یک اتصال زندهٔ سروری اشغال نمی‌کند و موتور جستجو هم صفحه را می‌بیند. *@
@@ -15,47 +16,55 @@
         <div>
             <h1 class="mb-1">کالاهای موجود</h1>
             <p class="text-muted mb-0 small">
-                قیمت‌ها به ریال است — برای ثبت سفارش کافی است با ما تماس بگیرید یا سفارش بگذارید.
+                قیمت‌ها به ریال است — ثبت سفارش بدون نیاز به ثبت‌نام انجام می‌شود.
             </p>
         </div>
         <span class="shop-chip">@products.Count.ToString("N0", Fa) کالا</span>
     </div>
 
-    @if (loading)
+    @if (categories.Count > 0)
     {
-        <div class="text-center text-muted py-5">
-            <span class="bi bi-hourglass-split me-1"></span>
-            در حال بارگذاری…
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <a href="/shop" class="shop-chip text-decoration-none">همه</a>
+
+            @foreach (var category in categories)
+            {
+                <a href="/shop?cat=@category.Id" class="shop-chip text-decoration-none">@category.Name</a>
+            }
         </div>
     }
-    else if (products.Count == 0)
+
+    @if (products.Count == 0)
     {
         <div class="alert alert-info mb-0">
-            هنوز کالای فعالی برای نمایش ثبت نشده است. کارمند انبار باید کالاها را در پنل ثبت کند.
+            کالایی با این مشخصات پیدا نشد.
+            <a href="/shop" class="ms-2">نمایش همهٔ کالاها</a>
         </div>
     }
     else
     {
-        @if (categories.Count > 0)
-        {
-            <div class="d-flex flex-wrap gap-2 mb-3">
-                @foreach (var category in categories)
-                {
-                    <span class="shop-chip">@category.Name</span>
-                }
-            </div>
-        }
-
         <div class="shop-grid">
             @foreach (var product in products)
             {
                 <div class="shop-card">
-                    <div class="shop-card-img">
-                        <span class="bi bi-box-seam" aria-hidden="true"></span>
-                    </div>
+                    <a href="/shop/product/@product.Id" class="text-decoration-none">
+                        <div class="shop-card-img">
+                            @if (!string.IsNullOrWhiteSpace(product.ImagePath))
+                            {
+                                <img src="/@product.ImagePath" alt="@product.Name"
+                                     style="width:100%;height:140px;object-fit:cover" />
+                            }
+                            else
+                            {
+                                <span class="bi bi-box-seam" aria-hidden="true"></span>
+                            }
+                        </div>
+                    </a>
 
                     <div class="shop-card-body">
-                        <div class="fw-semibold">@product.Name</div>
+                        <a href="/shop/product/@product.Id" class="text-decoration-none text-reset fw-semibold">
+                            @product.Name
+                        </a>
 
                         @if (!string.IsNullOrWhiteSpace(product.CategoryName))
                         {
@@ -64,7 +73,7 @@
 
                         <div class="small text-muted">واحد: @product.UnitTitle</div>
 
-                        <div class="mt-auto d-flex justify-content-between align-items-center">
+                        <div class="d-flex justify-content-between align-items-center">
                             <span class="shop-price">@Money(product.Price) ریال</span>
 
                             @if (product.InStock)
@@ -76,6 +85,20 @@
                                 <span class="badge bg-secondary">ناموجود</span>
                             }
                         </div>
+
+                        @if (product.InStock)
+                        {
+                            <form method="post" action="/shop/cart/add" class="mt-auto">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="productId" value="@product.Id" />
+                                <input type="hidden" name="quantity" value="1" />
+                                <input type="hidden" name="returnUrl" value="/shop" />
+                                <button class="btn btn-primary btn-sm w-100" type="submit">
+                                    <span class="bi bi-cart-plus me-1" aria-hidden="true"></span>
+                                    افزودن به سبد
+                                </button>
+                            </form>
+                        }
                     </div>
                 </div>
             }
@@ -89,15 +112,17 @@
 
     private List<ShopProductDto> products = new();
     private List<ShopCategoryDto> categories = new();
-    private bool loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        var query = Http.HttpContext?.Request.Query;
+
+        var search = query?["q"].FirstOrDefault();
+        var categoryId = int.TryParse(query?["cat"].FirstOrDefault(), out var parsed) ? parsed : (int?)null;
+
         categories = await Catalog.GetCategoriesAsync();
-        products = await Catalog.GetProductsAsync();
-        loading = false;
+        products = await Catalog.GetProductsAsync(search, categoryId);
     }
 
-    /// <summary>نمایش مبلغ با رقم فارسی</summary>
     private static string Money(decimal value) => value.ToString("N0", Fa);
 }

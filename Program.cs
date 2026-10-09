@@ -1,8 +1,20 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using WarehouseApp.Components;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using WarehouseApp.Data;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using WarehouseApp.Services;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,6 +43,27 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
 builder.Services.AddScoped<ExcelService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ShopCatalogService>();
+// ===== محدودسازی نرخ درخواست =====
+// فروشگاه عمومی سهم کمتری دارد تا یک ربات نتواند پنل انبار را از کار بیندازد.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var isShop = context.Request.Path.StartsWithSegments("/shop");
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            (isShop ? "shop:" : "panel:") + ip,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = isShop ? 120 : 600,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
+    });
+});
 
 // ===== احراز هویت با کوکی =====
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -161,11 +194,16 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// ===== نقطه‌های ورود فروشگاه (سبد خرید و ثبت سفارش) =====
+app.MapShopEndpoints();
 
 app.Run();

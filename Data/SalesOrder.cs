@@ -18,6 +18,21 @@ public enum OrderStatus
 }
 
 /// <summary>
+/// منبع سفارش — از کدام دروازه ثبت شده است
+/// </summary>
+public enum OrderSource
+{
+    /// <summary>پنل انبار (دستی)</summary>
+    Panel = 1,
+
+    /// <summary>فروشگاه اینترنتی</summary>
+    Shop = 2,
+
+    /// <summary>پنل فروشندگان</summary>
+    SalesRep = 3
+}
+
+/// <summary>
 /// سفارش فروش — سربرگ سفارش.
 /// تا زمانی که «پیش‌نویس» است روی انبار اثری ندارد؛ با تأیید، برای هر قلم یک
 /// حرکت «خروج» ثبت و از موجودی محصول کم می‌شود.
@@ -28,6 +43,9 @@ public class SalesOrder
 
     /// <summary>شمارهٔ سفارش (یکتا) — مثل SO-1405-0001</summary>
     public string OrderNumber { get; set; } = string.Empty;
+
+    /// <summary>منبع ثبت سفارش (پنل، فروشگاه یا فروشنده)</summary>
+    public OrderSource Source { get; set; } = OrderSource.Panel;
 
     public int PartyId { get; set; }
     public Party? Party { get; set; }

@@ -2,14 +2,22 @@
 @attribute [Authorize]
 @inherits PageBase
 @rendermode InteractiveServer
+@inject IWebHostEnvironment Environment
 @using Microsoft.AspNetCore.Components.Forms
+@inject IWebHostEnvironment Environment
 @using System.Globalization
+@inject IWebHostEnvironment Environment
 @using Microsoft.AspNetCore.Components.Forms
+@inject IWebHostEnvironment Environment
 @using WarehouseApp.Data
+@inject IWebHostEnvironment Environment
 @using Microsoft.AspNetCore.Components.Forms
+@inject IWebHostEnvironment Environment
 @using Microsoft.EntityFrameworkCore
 
+@inject IWebHostEnvironment Environment
 @using Microsoft.AspNetCore.Components.Forms
+@inject IWebHostEnvironment Environment
 @using WarehouseApp.Services
 @inject ExcelService Excel
 @inject ToastService Toasts
@@ -115,6 +123,7 @@
                 <th>سود واحد</th>
                 <th>موجودی</th>
                 <th>حد سفارش</th>
+                <th>عکس</th>
                 <th>وضعیت</th>
                 <th>عملیات</th>
             </tr>
@@ -123,7 +132,7 @@
             @if (pagedProducts.Count == 0)
             {
                 <tr>
-                    <td colspan="11" class="text-center text-muted">هیچ کالایی با این فیلترها پیدا نشد</td>
+                    <td colspan="12" class="text-center text-muted">هیچ کالایی با این فیلترها پیدا نشد</td>
                 </tr>
             }
             else
@@ -176,6 +185,17 @@
                             </div>
                         </td>
                         <td class="small">@(product.ReorderLevel > 0 ? product.ReorderLevel.ToString("N0", Fa) + " " + product.UnitTitle : "—")</td>
+                        <td style="width:78px">
+                            @if (!string.IsNullOrWhiteSpace(product.ImagePath))
+                            {
+                                <img src="/@product.ImagePath" alt="@product.Name"
+                                     style="width:54px;height:54px;object-fit:cover;border-radius:8px" />
+                            }
+                            <label for="@("img_" + product.Id)" class="btn btn-sm btn-outline-secondary mb-0 @(product.ImagePath is null ? "" : "mt-1")" title="انتخاب عکس کالا">
+                                <span class="bi bi-image" aria-hidden="true"></span>
+                            </label>
+                            <InputFile id="@("img_" + product.Id)" OnChange="e => UploadImage(e, product)" accept="image/*" class="d-none" />
+                        </td>
                         <td>
                             <span class="badge @product.StockBadge">@product.StockStatus</span>
                         </td>
@@ -567,6 +587,80 @@
 
     private bool isExporting = false;
 
+    /// <summary>ذخیرهٔ عکس کالا در پوشهٔ uploads/products — فقط برای کالاهای فعال</summary>
+    private async Task UploadImage(InputFileChangeEventArgs e, Product product)
+    {
+        if (!Can(Permissions.ManageProducts))
+        {
+            Toasts.ShowError("شما اجازهٔ ویرایش کالا را ندارید");
+            return;
+        }
+
+        var file = e.File;
+
+        if (file is null || file.Size == 0)
+        {
+            return;
+        }
+
+        if (file.Size > 3 * 1024 * 1024)
+        {
+            Toasts.ShowError("حجم عکس باید کمتر از ۳ مگابایت باشد");
+            return;
+        }
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp" or ".gif"))
+        {
+            Toasts.ShowError("فقط عکس با قالب jpg یا png یا webp یا gif مجاز است");
+            return;
+        }
+
+        try
+        {
+            var folder = Path.Combine(Environment.WebRootPath, "uploads", "products");
+            Directory.CreateDirectory(folder);
+
+            var fileName = $"{product.Id}_{Guid.NewGuid():N}{extension}";
+            var fullPath = Path.Combine(folder, fileName);
+
+            await using (var stream = File.Create(fullPath))
+            {
+                await file.OpenReadStream(3 * 1024 * 1024).CopyToAsync(stream);
+            }
+
+            var tracked = await Db.Products.FirstOrDefaultAsync(x => x.Id == product.Id);
+
+            if (tracked is null)
+            {
+                Toasts.ShowError("کالا پیدا نشد");
+                return;
+            }
+
+            var oldPath = tracked.ImagePath;
+            tracked.ImagePath = $"uploads/products/{fileName}";
+            await Db.SaveChangesAsync();
+
+            if (!string.IsNullOrWhiteSpace(oldPath))
+            {
+                var oldFull = Path.Combine(Environment.WebRootPath, oldPath.Replace('/', Path.DirectorySeparatorChar));
+
+                if (File.Exists(oldFull))
+                {
+                    File.Delete(oldFull);
+                }
+            }
+
+            await LoadProducts();
+
+            Toasts.ShowSuccess($"عکس کالای «{product.Name}» ذخیره شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیرهٔ عکس: {ex.Message}");
+        }
+    }
     /// <summary>ورود گروهی کالا از فایل اکسل — ستون‌ها: کد، نام، واحد، قیمت فروش، بهای خرید، موجودی، حد سفارش، دسته</summary>
     private async Task ImportProducts(InputFileChangeEventArgs e)
     {

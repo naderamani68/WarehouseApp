@@ -1,0 +1,113 @@
+﻿@page "/shop/order/{Number}"
+@layout WarehouseApp.Components.Layout.ShopLayout
+@using System.Globalization
+@using WarehouseApp.Services
+@inject ShopCatalogService Catalog
+@inject IHttpContextAccessor Http
+
+@* پیگیری سفارش فقط با «شمارهٔ سفارش + شمارهٔ تلفن» ممکن است،
+   تا کسی نتواند با حدس زدن شمارهٔ سفارش، اطلاعات دیگران را ببیند. *@
+
+<PageTitle>پیگیری سفارش</PageTitle>
+
+<div class="container py-4" style="max-width:640px">
+
+    <h1 class="mb-3">پیگیری سفارش</h1>
+
+    @if (order is not null)
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span dir="ltr">@order.Number</span>
+                <span class="badge @order.StatusBadge">@order.StatusTitle</span>
+            </div>
+
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">مشتری</span>
+                    <span>@order.CustomerName</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">تاریخ ثبت</span>
+                    <span>@PersianDate.ToDate(order.OrderDate)</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">تعداد اقلام</span>
+                    <span>@order.ItemCount.ToString("N0", Fa)</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">مبلغ کل</span>
+                    <span class="fw-bold">@order.Total.ToString("N0", Fa) ریال</span>
+                </div>
+
+                <hr />
+
+                <p class="mb-0 small text-muted">
+                    @switch (order.StatusTitle)
+                    {
+                        case "پیش‌نویس":
+                            <span>سفارش ثبت شده و در انتظار تأیید انبار است. همکاران ما با تو تماس می‌گیرند.</span>
+                            break;
+                        case "تأییدشده":
+                            <span>سفارش تأیید و از انبار خارج شده است.</span>
+                            break;
+                        default:
+                            <span>این سفارش لغو شده است.</span>
+                            break;
+                    }
+                </p>
+            </div>
+        </div>
+
+        <a href="/shop" class="btn btn-outline-secondary btn-sm mt-3">بازگشت به فروشگاه</a>
+    }
+    else
+    {
+        @if (lookedUp)
+        {
+            <div class="alert alert-warning">
+                سفارشی با این شماره و شمارهٔ تلفن پیدا نشد. شمارهٔ سفارش را کامل و درست وارد کن.
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted small">
+                    شمارهٔ سفارش را از پیام تأیید بردار و همراه با شمارهٔ تلفنی که سفارش را با آن ثبت کرده‌ای وارد کن.
+                </p>
+
+                <form method="get" action="/shop/order/@Number">
+                    <div class="mb-2">
+                        <label class="form-label">شمارهٔ تلفن</label>
+                        <input class="form-control" name="phone" dir="ltr" required placeholder="09xxxxxxxxx" />
+                    </div>
+
+                    <button class="btn btn-primary" type="submit">نمایش وضعیت سفارش</button>
+                </form>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private static readonly CultureInfo Fa = new("fa-IR");
+
+    [Parameter] public string Number { get; set; } = string.Empty;
+
+    private ShopOrderDto? order;
+    private bool lookedUp;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var phone = Http.HttpContext?.Request.Query["phone"].FirstOrDefault();
+        lookedUp = !string.IsNullOrWhiteSpace(phone);
+
+        if (!lookedUp)
+        {
+            return;
+        }
+
+        order = await Catalog.GetOrderAsync(Number, phone);
+    }
+}

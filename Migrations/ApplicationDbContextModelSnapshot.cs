@@ -660,6 +660,9 @@ namespace WarehouseApp.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("ImagePath")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -742,7 +745,7 @@ namespace WarehouseApp.Migrations
                             IsActive = true,
                             IsSystemRole = true,
                             Name = "مدیر انبار",
-                            Permissions = 16774143
+                            Permissions = 33551359
                         },
                         new
                         {
@@ -792,6 +795,9 @@ namespace WarehouseApp.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("PartyId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Source")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")

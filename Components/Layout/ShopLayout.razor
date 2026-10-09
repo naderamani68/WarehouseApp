@@ -1,24 +1,51 @@
 ﻿@inherits LayoutComponentBase
+@using System.Globalization
+@using WarehouseApp.Services
+@inject IHttpContextAccessor Http
 
 @* چیدمان فروشگاه — کاملاً جدا از چیدمان پنل انبار.
    منوی مدیریت، نام کارمندان و اطلاعات داخلی در این چیدمان وجود ندارد. *@
 
+@{
+    var cartCount = Http.HttpContext is null ? 0 : ShopCart.CountItems(ShopCart.Read(Http.HttpContext));
+}
+
 <div class="shop-page">
 
     <header class="shop-header">
-        <div class="container d-flex justify-content-between align-items-center">
+        <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
+
             <a class="shop-brand" href="/shop">
                 <span class="bi bi-shop" aria-hidden="true"></span>
                 فروشگاه
             </a>
 
+            <form method="get" action="/shop" class="d-flex gap-1" style="max-width:320px;flex:1">
+                <input class="form-control form-control-sm" name="q" placeholder="جستجوی کالا…" />
+                <button class="btn btn-sm btn-outline-secondary" type="submit" title="جستجو">
+                    <span class="bi bi-search" aria-hidden="true"></span>
+                </button>
+            </form>
+
             <div class="d-flex align-items-center gap-3">
-                <span class="shop-link disabled" title="در قدم‌های بعدی ساخته می‌شود">
+                <a class="shop-link" href="/shop/order/track">
+                    <span class="bi bi-search-heart me-1" aria-hidden="true"></span>
+                    پیگیری سفارش
+                </a>
+
+                <a class="shop-link" href="/shop/cart">
                     <span class="bi bi-cart3 me-1" aria-hidden="true"></span>
-                    سبد خرید — به‌زودی
-                </span>
+                    سبد خرید
+
+                    @if (cartCount > 0)
+                    {
+                        <span class="badge bg-primary">@cartCount.ToString("N0", Fa)</span>
+                    }
+                </a>
+
                 <a class="shop-link" href="/">ورود کارمندان</a>
             </div>
+
         </div>
     </header>
 
@@ -33,3 +60,7 @@
     </footer>
 
 </div>
+
+@code {
+    private static readonly CultureInfo Fa = new("fa-IR");
+}

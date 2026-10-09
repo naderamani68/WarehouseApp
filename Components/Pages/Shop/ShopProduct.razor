@@ -1,0 +1,128 @@
+﻿@page "/shop/product/{Id:int}"
+@layout WarehouseApp.Components.Layout.ShopLayout
+@using System.Globalization
+@using WarehouseApp.Services
+@inject ShopCatalogService Catalog
+
+<PageTitle>@(product is null ? "کالا یافت نشد" : product.Name)</PageTitle>
+
+<div class="container py-4">
+
+    @if (product is null)
+    {
+        <div class="alert alert-info">
+            این کالا پیدا نشد یا از فروش خارج شده است.
+            <a href="/shop" class="ms-2">بازگشت به فهرست کالاها</a>
+        </div>
+    }
+    else
+    {
+        <nav class="mb-3 small">
+            <a href="/shop" class="shop-link">فهرست کالاها</a>
+            <span class="text-muted mx-1">/</span>
+            <span>@product.Name</span>
+        </nav>
+
+        <div class="row g-4">
+            <div class="col-12 col-md-5">
+                <div class="shop-card">
+                    <div class="shop-card-img" style="height:280px">
+                        @if (!string.IsNullOrWhiteSpace(product.ImagePath))
+                        {
+                            <img src="/@product.ImagePath" alt="@product.Name"
+                                 style="width:100%;height:280px;object-fit:cover" />
+                        }
+                        else
+                        {
+                            <span class="bi bi-box-seam" aria-hidden="true"></span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-7">
+                <h1 class="mb-2">@product.Name</h1>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @if (!string.IsNullOrWhiteSpace(product.CategoryName))
+                    {
+                        <span class="shop-chip">@product.CategoryName</span>
+                    }
+                    <span class="shop-chip">واحد: @product.UnitTitle</span>
+
+                    @if (product.InStock)
+                    {
+                        <span class="badge bg-success">موجود در انبار</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">ناموجود</span>
+                    }
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <span class="text-muted small">قیمت</span>
+                        <span class="fs-4 fw-bold shop-price">@Money(product.Price) ریال</span>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(product.Description))
+                {
+                    <div class="mb-3">
+                        <div class="fw-semibold mb-1">توضیحات</div>
+                        <p class="text-muted mb-0">@product.Description</p>
+                    </div>
+                }
+
+                @if (product.InStock)
+                {
+                    <form method="post" action="/shop/cart/add">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="productId" value="@product.Id" />
+                        <input type="hidden" name="returnUrl" value="/shop/product/@product.Id" />
+
+                        <div class="d-flex gap-2 align-items-end" style="max-width:340px">
+                            <div>
+                                <label class="form-label">تعداد</label>
+                                <input class="form-control" type="number" name="quantity" value="1"
+                                       min="1" max="@Math.Max(1, product.Available)" />
+                            </div>
+
+                            <button class="btn btn-primary" type="submit">
+                                <span class="bi bi-cart-plus me-1" aria-hidden="true"></span>
+                                افزودن به سبد
+                            </button>
+                        </div>
+                    </form>
+
+                    <p class="text-muted small mt-2 mb-0">
+                        ثبت سفارش بدون نیاز به ثبت‌نام انجام می‌شود؛ فقط نام، تلفن و نشانی لازم است.
+                    </p>
+                }
+                else
+                {
+                    <div class="alert alert-warning mb-0">
+                        این کالا فعلاً موجود نیست. برای اطلاع از موجود شدن، با ما تماس بگیرید.
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private static readonly CultureInfo Fa = new("fa-IR");
+
+    [Parameter] public int Id { get; set; }
+
+    private ShopProductDto? product;
+
+    protected override async Task OnInitializedAsync()
+    {
+        product = await Catalog.GetProductAsync(Id);
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa);
+}
