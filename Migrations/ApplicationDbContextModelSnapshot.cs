@@ -22,6 +22,158 @@ namespace WarehouseApp.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("WarehouseApp.Data.AppSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Group")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Hint")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("AppSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Key = "Tax.VatPercent",
+                            Group = "مالیات",
+                            Hint = "نرخ قانونی روز — با تغییر قانون فقط همین عدد را عوض کن",
+                            SortOrder = 1,
+                            Title = "نرخ مالیات بر ارزش افزوده (درصد)",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "10",
+                            ValueType = "percent"
+                        },
+                        new
+                        {
+                            Key = "Tax.VatEnabled",
+                            Group = "مالیات",
+                            Hint = "اگر خاموش باشد، مالیات روی فاکتور محاسبه نمی‌شود",
+                            SortOrder = 2,
+                            Title = "محاسبهٔ مالیات در فاکتور فروش",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "false",
+                            ValueType = "bool"
+                        },
+                        new
+                        {
+                            Key = "Tax.VatOnPurchase",
+                            Group = "مالیات",
+                            Hint = "مالیات پرداختی بابت خرید کالا و خدمات",
+                            SortOrder = 3,
+                            Title = "محاسبهٔ مالیات در خرید",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "false",
+                            ValueType = "bool"
+                        },
+                        new
+                        {
+                            Key = "Company.Name",
+                            Group = "اطلاعات شرکت",
+                            Hint = "روی سرصفحهٔ فاکتور چاپ می‌شود",
+                            SortOrder = 1,
+                            Title = "نام شرکت یا فروشگاه",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Company.Phone",
+                            Group = "اطلاعات شرکت",
+                            SortOrder = 2,
+                            Title = "تلفن",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Company.Address",
+                            Group = "اطلاعات شرکت",
+                            SortOrder = 3,
+                            Title = "نشانی",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Company.EconomicCode",
+                            Group = "اطلاعات شرکت",
+                            SortOrder = 4,
+                            Title = "کد اقتصادی",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Company.NationalId",
+                            Group = "اطلاعات شرکت",
+                            SortOrder = 5,
+                            Title = "شناسهٔ ملی",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Sales.InvoicePrefix",
+                            Group = "فروش",
+                            Hint = "مثلاً SO که ابتدای شمارهٔ فاکتور می‌آید",
+                            SortOrder = 1,
+                            Title = "پیشوند شمارهٔ فاکتور",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "SO",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Sales.DefaultPaymentDays",
+                            Group = "فروش",
+                            Hint = "برای ساخت خودکار تاریخ سررسید فاکتور",
+                            SortOrder = 2,
+                            Title = "مهلت پرداخت پیش‌فرض (روز)",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "0",
+                            ValueType = "number"
+                        });
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.AuditLog", b =>
                 {
                     b.Property<int>("Id")
@@ -487,21 +639,57 @@ namespace WarehouseApp.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("CostPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("Name")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
+                    b.Property<int>("ReorderLevel")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SalePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Unit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Products");
                 });
@@ -554,7 +742,7 @@ namespace WarehouseApp.Migrations
                             IsActive = true,
                             IsSystemRole = true,
                             Name = "مدیر انبار",
-                            Permissions = 8385535
+                            Permissions = 16774143
                         },
                         new
                         {

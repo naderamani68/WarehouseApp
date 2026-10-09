@@ -171,6 +171,16 @@
             </div>
         }
 
+        @if (canManageSettings)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="settings">
+                    <span class="bi bi-sliders me-2" aria-hidden="true"></span>
+                    تنظیمات
+                </NavLink>
+            </div>
+        }
+
     </nav>
 </div>
 
@@ -181,6 +191,7 @@
     private bool canViewParties;
     private bool canViewCrm;
     private bool canViewFinance;
+    private bool canManageSettings;
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,5 +204,6 @@
         canViewParties = (permissions & Permissions.ViewParties) == Permissions.ViewParties;
         canViewCrm = (permissions & Permissions.ViewCrm) == Permissions.ViewCrm;
         canViewFinance = (permissions & Permissions.ViewFinance) == Permissions.ViewFinance;
+        canManageSettings = (permissions & Permissions.ManageSettings) == Permissions.ManageSettings;
     }
 }

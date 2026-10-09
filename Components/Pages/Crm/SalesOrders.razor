@@ -92,11 +92,11 @@ else
                     {
                         <tr>
                             <td>
-                                <select class="form-select form-select-sm" @bind="line.ProductId">
+                                <select class="form-select form-select-sm" @bind="line.ProductId" @bind:after="() => ApplyProductDefaults(line)">
                                     <option value="0">— انتخاب کالا —</option>
                                     @foreach (var p in products)
                                     {
-                                        <option value="@p.Id">@p.Name (موجودی: @p.Quantity.ToString("N0", Fa))</option>
+                                        <option value="@p.Id">@p.Name (موجودی: @p.Quantity.ToString("N0", Fa) @p.UnitTitle)</option>
                                     }
                                 </select>
                             </td>
@@ -411,6 +411,22 @@ else
     }
 
     private void AddLine() => lines.Add(new LineDraft());
+
+    /// <summary>با انتخاب کالا، قیمت فروش ثبت‌شده در شناسنامهٔ کالا خودکار پر می‌شود</summary>
+    private void ApplyProductDefaults(LineDraft line)
+    {
+        var product = products.FirstOrDefault(p => p.Id == line.ProductId);
+
+        if (product is null)
+        {
+            return;
+        }
+
+        if (line.UnitPriceValue <= 0 && product.SalePrice > 0)
+        {
+            line.UnitPrice = product.SalePrice.ToString(CultureInfo.InvariantCulture);
+        }
+    }
 
     private void RemoveLine(LineDraft line)
     {

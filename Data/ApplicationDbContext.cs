@@ -29,6 +29,9 @@ namespace WarehouseApp.Data
         public DbSet<Debt> Debts { get; set; }         // بدهی و طلب
         public DbSet<Expense> Expenses { get; set; }   // هزینه‌ها
 
+        // ===== تنظیمات =====
+        public DbSet<AppSetting> AppSettings { get; set; }   // تنظیمات قابل ویرایش (نرخ مالیات، اطلاعات شرکت)
+
         // 👇 متد جدید برای تنظیم رفتار حذف دسته
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -39,6 +42,22 @@ namespace WarehouseApp.Data
                 .WithMany(c => c.Products)
                 .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // کد کالا باید یکتا باشد — ولی چند کالای بدون کد مجاز است
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => p.Code)
+                .IsUnique()
+                .HasFilter("[Code] IS NOT NULL");
+
+            // برای کالاهایی که از قبل در پایگاه داده هستند، مقدار پیش‌فرض منطقی می‌گذاریم
+            // تا «غیرفعال» یا واحد صفر نشوند
+            modelBuilder.Entity<Product>()
+                .Property(p => p.IsActive)
+                .HasDefaultValue(true);
+
+            modelBuilder.Entity<Product>()
+                .Property(p => p.Unit)
+                .HasDefaultValue(ProductUnit.Number);
 
             // نام کاربری و کد پرسنلی هر کارمند باید یکتا باشد
             modelBuilder.Entity<Employee>()
@@ -147,6 +166,22 @@ namespace WarehouseApp.Data
 
             modelBuilder.Entity<Expense>()
                 .HasIndex(e => e.At);
+
+            // ===== تنظیمات پیش‌فرض =====
+            // این مقدارها در پایگاه داده ذخیره می‌شوند و از صفحهٔ «تنظیمات» قابل ویرایش‌اند
+            var seedDate = new DateTime(2026, 1, 1);
+
+            modelBuilder.Entity<AppSetting>().HasData(
+                new AppSetting { Key = "Tax.VatPercent", Value = "10", Title = "نرخ مالیات بر ارزش افزوده (درصد)", Group = "مالیات", ValueType = "percent", SortOrder = 1, Hint = "نرخ قانونی روز — با تغییر قانون فقط همین عدد را عوض کن", UpdatedAt = seedDate },
+                new AppSetting { Key = "Tax.VatEnabled", Value = "false", Title = "محاسبهٔ مالیات در فاکتور فروش", Group = "مالیات", ValueType = "bool", SortOrder = 2, Hint = "اگر خاموش باشد، مالیات روی فاکتور محاسبه نمی‌شود", UpdatedAt = seedDate },
+                new AppSetting { Key = "Tax.VatOnPurchase", Value = "false", Title = "محاسبهٔ مالیات در خرید", Group = "مالیات", ValueType = "bool", SortOrder = 3, Hint = "مالیات پرداختی بابت خرید کالا و خدمات", UpdatedAt = seedDate },
+                new AppSetting { Key = "Company.Name", Value = "", Title = "نام شرکت یا فروشگاه", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 1, Hint = "روی سرصفحهٔ فاکتور چاپ می‌شود", UpdatedAt = seedDate },
+                new AppSetting { Key = "Company.Phone", Value = "", Title = "تلفن", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 2, UpdatedAt = seedDate },
+                new AppSetting { Key = "Company.Address", Value = "", Title = "نشانی", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 3, UpdatedAt = seedDate },
+                new AppSetting { Key = "Company.EconomicCode", Value = "", Title = "کد اقتصادی", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 4, UpdatedAt = seedDate },
+                new AppSetting { Key = "Company.NationalId", Value = "", Title = "شناسهٔ ملی", Group = "اطلاعات شرکت", ValueType = "text", SortOrder = 5, UpdatedAt = seedDate },
+                new AppSetting { Key = "Sales.InvoicePrefix", Value = "SO", Title = "پیشوند شمارهٔ فاکتور", Group = "فروش", ValueType = "text", SortOrder = 1, Hint = "مثلاً SO که ابتدای شمارهٔ فاکتور می‌آید", UpdatedAt = seedDate },
+                new AppSetting { Key = "Sales.DefaultPaymentDays", Value = "0", Title = "مهلت پرداخت پیش‌فرض (روز)", Group = "فروش", ValueType = "number", SortOrder = 2, Hint = "برای ساخت خودکار تاریخ سررسید فاکتور", UpdatedAt = seedDate });
 
             // ===== نقش‌های پیش‌فرض =====
             modelBuilder.Entity<Role>().HasData(

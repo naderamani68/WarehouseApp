@@ -79,11 +79,14 @@ public enum Permissions
     /// <summary>حذف سند مالی و هزینه</summary>
     DeleteFinance = 1 << 22,
 
+    /// <summary>مدیریت تنظیمات سیستم (نرخ مالیات، اطلاعات شرکت)</summary>
+    ManageSettings = 1 << 23,
+
     /// <summary>همهٔ اختیارات</summary>
     All = ViewData | ManageProducts | DeleteProducts | ManageCategories | DeleteCategories
         | ManageWarehouses | DeleteWarehouses | RegisterMovements | ExportExcel
         | ViewReports | ManageEmployees | ManageRoles | ViewAuditLog
         | ViewParties | ManageParties | DeleteParties
         | ViewCrm | ManageCrm | DeleteCrm | ConfirmSalesOrders
-        | ViewFinance | ManageFinance | DeleteFinance
+        | ViewFinance | ManageFinance | DeleteFinance | ManageSettings
 }

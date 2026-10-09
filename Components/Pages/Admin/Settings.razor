@@ -1,0 +1,214 @@
+﻿@page "/settings"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ToastService Toasts
+
+<PageTitle>تنظیمات | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">⚙️ تنظیمات سیستم</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به تنظیمات را ندارید.</div>
+}
+else if (loading)
+{
+    <div class="text-muted">در حال بارگذاری…</div>
+}
+else
+{
+    <div class="alert alert-info">
+        💡 این تنظیمات در پایگاه داده ذخیره می‌شوند، نه در کد برنامه.
+        یعنی اگر قانون مالیات عوض شد، فقط عدد را همین‌جا تغییر بده؛ نیازی به تغییر برنامه نیست.
+    </div>
+
+    @foreach (var group in groupedSettings)
+    {
+        <div class="card p-3 mb-3">
+            <h5 class="mb-3">@group.Key</h5>
+
+            <div class="row g-3">
+                @foreach (var item in group)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label">@item.Title</label>
+
+                        @if (item.ValueType == "bool")
+                        {
+                            <select class="form-select" value="@(IsTrue(draft[item.Key]) ? "true" : "false")"
+                                    @onchange="e => Set(item.Key, e.Value?.ToString())">
+                                <option value="true">بله — فعال</option>
+                                <option value="false">خیر — غیرفعال</option>
+                            </select>
+                        }
+                        else
+                        {
+                            <div class="input-group">
+                                <input class="form-control" dir="ltr"
+                                       value="@draft[item.Key]"
+                                       @onchange="e => Set(item.Key, e.Value?.ToString())" />
+                                @if (item.ValueType == "percent")
+                                {
+                                    <span class="input-group-text">٪</span>
+                                }
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(item.Hint))
+                        {
+                            <div class="text-muted small mt-1">@item.Hint</div>
+                        }
+
+                        @if (item.UpdatedAt > new DateTime(2020, 1, 1))
+                        {
+                            <div class="text-muted small">
+                                آخرین تغییر: @PersianDate.ToDateTime(item.UpdatedAt)
+                                @if (!string.IsNullOrWhiteSpace(item.Username))
+                                {
+                                    <span>— @item.Username</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="card p-3 mb-3">
+        <h6 class="mb-2">🧮 پیش‌نمایش مالیات</h6>
+        @if (!IsTrue(draft.GetValueOrDefault(SettingKeys.VatEnabled)))
+        {
+            <div class="text-muted small">
+                محاسبهٔ مالیات در فاکتور خاموش است. اگر روشنش کنی، مالیات روی فاکتورهای جدید حساب می‌شود.
+            </div>
+        }
+        else
+        {
+            var rate = SettingsService.ParseDecimal(draft.GetValueOrDefault(SettingKeys.VatPercent)) ?? 0m;
+            var sample = 10_000_000m;
+            <div class="small">
+                با نرخ <strong>@rate.ToString("N1", Fa)٪</strong>، روی فاکتور نمونهٔ
+                <strong>@Money(sample)</strong> مبلغ مالیات
+                <strong>@Money(Math.Round(sample * rate / 100m, 0))</strong> می‌شود و
+                جمع فاکتور <strong>@Money(sample + Math.Round(sample * rate / 100m, 0))</strong> خواهد بود.
+            </div>
+        }
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
+            @if (busy)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            ذخیرهٔ همهٔ تنظیمات
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="ReloadAsync" disabled="@busy">بازگرداندن مقادیر ذخیره‌شده</button>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool loading = true;
+    private bool busy;
+    private string? currentUsername;
+
+    private List<AppSetting> settings = new();
+    private readonly Dictionary<string, string?> draft = new();
+
+    private IEnumerable<IGrouping<string, AppSetting>> groupedSettings
+        => settings.GroupBy(s => s.Group);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
+
+        allowed = await Access.HasAsync(user, Permissions.ManageSettings);
+
+        if (!allowed)
+        {
+            loading = false;
+            return;
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        loading = true;
+        settings = await SettingsService.GetAllAsync(Db);
+
+        draft.Clear();
+        foreach (var item in settings)
+        {
+            draft[item.Key] = item.Value;
+        }
+
+        loading = false;
+    }
+
+    private void Set(string key, string? value)
+    {
+        draft[key] = value;
+    }
+
+    private static bool IsTrue(string? value) => SettingsService.ParseBool(value) ?? false;
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            busy = true;
+
+            // اعتبارسنجی درصدها
+            foreach (var item in settings.Where(s => s.ValueType == "percent"))
+            {
+                var value = SettingsService.ParseDecimal(draft[item.Key]);
+
+                if (value is null || value < 0 || value > 100)
+                {
+                    Toasts.ShowError($"مقدار «{item.Title}» باید عددی بین ۰ تا ۱۰۰ باشد");
+                    return;
+                }
+            }
+
+            var changed = await SettingsService.SetManyAsync(Db, draft, currentUsername);
+
+            if (changed == 0)
+            {
+                Toasts.ShowSuccess("تغییری برای ذخیره نبود");
+            }
+            else
+            {
+                Toasts.ShowSuccess($"{changed.ToString("N0", Fa)} تنظیم ذخیره شد");
+            }
+
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

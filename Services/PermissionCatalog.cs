@@ -33,6 +33,7 @@ public static class PermissionCatalog
         new(Permissions.ViewFinance,       "دیدن وضعیت مالی",            "مالی و حسابداری"),
         new(Permissions.ManageFinance,     "افزودن و ویرایش سند مالی و هزینه", "مالی و حسابداری"),
         new(Permissions.DeleteFinance,     "حذف سند مالی و هزینه",       "مالی و حسابداری"),
+        new(Permissions.ManageSettings,    "مدیریت تنظیمات سیستم",        "مدیریت سیستم"),
         new(Permissions.ManageEmployees,   "مدیریت کارمندان",            "مدیریت سیستم"),
         new(Permissions.ManageRoles,       "مدیریت نقش‌ها و دسترسی‌ها",  "مدیریت سیستم")
     };
