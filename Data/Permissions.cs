@@ -82,11 +82,14 @@ public enum Permissions
     /// <summary>مدیریت تنظیمات سیستم (نرخ مالیات، اطلاعات شرکت)</summary>
     ManageSettings = 1 << 23,
 
+    /// <summary>پنل فروشندگان — دیدن سفارش‌های خودِ فروشنده</summary>
+    SalesPanel = 1 << 24,
+
     /// <summary>همهٔ اختیارات</summary>
     All = ViewData | ManageProducts | DeleteProducts | ManageCategories | DeleteCategories
         | ManageWarehouses | DeleteWarehouses | RegisterMovements | ExportExcel
         | ViewReports | ManageEmployees | ManageRoles | ViewAuditLog
         | ViewParties | ManageParties | DeleteParties
         | ViewCrm | ManageCrm | DeleteCrm | ConfirmSalesOrders
-        | ViewFinance | ManageFinance | DeleteFinance | ManageSettings
+        | ViewFinance | ManageFinance | DeleteFinance | ManageSettings | SalesPanel
 }

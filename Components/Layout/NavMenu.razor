@@ -71,6 +71,7 @@
     private bool canViewCrm;
     private bool canViewFinance;
     private bool canManageSettings;
+    private bool canSalesPanel;
 
     private List<NavSection> sections = new();
 
@@ -101,6 +102,7 @@
         canViewCrm = (permissions & Permissions.ViewCrm) == Permissions.ViewCrm;
         canViewFinance = (permissions & Permissions.ViewFinance) == Permissions.ViewFinance;
         canManageSettings = (permissions & Permissions.ManageSettings) == Permissions.ManageSettings;
+        canSalesPanel = (permissions & Permissions.SalesPanel) == Permissions.SalesPanel;
 
         BuildSections();
     }
@@ -130,6 +132,11 @@
             sales.Add(new NavItem("داشبورد فروش", "crm", "bi-speedometer2", Exact: true));
         }
 
+        if (canSalesPanel && !canViewCrm)
+        {
+            sales.Add(new NavItem("سفارش‌های من", "sales", "bi-person-badge"));
+        }
+
         if (canViewParties)
         {
             sales.Add(new NavItem("مشتریان و تأمین‌کنندگان", "crm/parties", "bi-people"));
@@ -140,6 +147,7 @@
             sales.Add(new NavItem("پیگیری‌ها", "crm/interactions", "bi-telephone-outbound"));
             sales.Add(new NavItem("فرصت‌های فروش", "crm/opportunities", "bi-graph-up-arrow"));
             sales.Add(new NavItem("سفارش‌های فروش", "crm/orders", "bi-receipt"));
+            sales.Add(new NavItem("سفارش‌های من", "sales", "bi-person-badge"));
         }
 
         var finance = new List<NavItem>();
