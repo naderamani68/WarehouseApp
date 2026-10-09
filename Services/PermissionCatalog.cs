@@ -30,6 +30,9 @@ public static class PermissionCatalog
         new(Permissions.ManageCrm,         "افزودن و ویرایش پیگیری، فرصت و سفارش", "فروش و پیگیری (CRM)"),
         new(Permissions.DeleteCrm,         "حذف پیگیری، فرصت و سفارش",     "فروش و پیگیری (CRM)"),
         new(Permissions.ConfirmSalesOrders,"تأیید سفارش فروش و کسر از انبار", "فروش و پیگیری (CRM)"),
+        new(Permissions.ViewFinance,       "دیدن وضعیت مالی",            "مالی و حسابداری"),
+        new(Permissions.ManageFinance,     "افزودن و ویرایش سند مالی و هزینه", "مالی و حسابداری"),
+        new(Permissions.DeleteFinance,     "حذف سند مالی و هزینه",       "مالی و حسابداری"),
         new(Permissions.ManageEmployees,   "مدیریت کارمندان",            "مدیریت سیستم"),
         new(Permissions.ManageRoles,       "مدیریت نقش‌ها و دسترسی‌ها",  "مدیریت سیستم")
     };

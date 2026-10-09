@@ -70,10 +70,20 @@ public enum Permissions
     /// <summary>تأیید سفارش فروش (کسر واقعی از انبار)</summary>
     ConfirmSalesOrders = 1 << 19,
 
+    /// <summary>دیدن وضعیت مالی (چک، سفته، بدهی، طلب و هزینه‌ها)</summary>
+    ViewFinance = 1 << 20,
+
+    /// <summary>افزودن و ویرایش سند مالی و هزینه</summary>
+    ManageFinance = 1 << 21,
+
+    /// <summary>حذف سند مالی و هزینه</summary>
+    DeleteFinance = 1 << 22,
+
     /// <summary>همهٔ اختیارات</summary>
     All = ViewData | ManageProducts | DeleteProducts | ManageCategories | DeleteCategories
         | ManageWarehouses | DeleteWarehouses | RegisterMovements | ExportExcel
         | ViewReports | ManageEmployees | ManageRoles | ViewAuditLog
         | ViewParties | ManageParties | DeleteParties
         | ViewCrm | ManageCrm | DeleteCrm | ConfirmSalesOrders
+        | ViewFinance | ManageFinance | DeleteFinance
 }

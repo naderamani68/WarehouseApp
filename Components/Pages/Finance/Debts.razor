@@ -1,0 +1,677 @@
+﻿@page "/finance/debts"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>بدهی و طلب | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">🤝 بدهی و طلب</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">بدهی ما (باز)</div>
+                <div class="fs-5 fw-bold text-danger">@Money(statPayable)</div>
+                <div class="text-muted small">@statPayableCount.ToString("N0", Fa) مورد</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">طلب ما (باز)</div>
+                <div class="fs-5 fw-bold text-success">@Money(statReceivable)</div>
+                <div class="text-muted small">@statReceivableCount.ToString("N0", Fa) مورد</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">سررسید گذشته</div>
+                <div class="fs-5 fw-bold @(statOverdueCount > 0 ? "text-danger" : "")">@statOverdueCount.ToString("N0", Fa) مورد</div>
+                <div class="text-muted small">نیاز به پیگیری</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">اختلاف (طلب − بدهی)</div>
+                <div class="fs-5 fw-bold @(statReceivable - statPayable >= 0 ? "text-success" : "text-danger")">
+                    @Money(statReceivable - statPayable)
+                </div>
+                <div class="text-muted small">از موارد باز</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "ثبت بدهی یا طلب جدید" : $"ویرایش: {editing.Title}")</h5>
+
+        <div class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">نوع</label>
+                <select class="form-select" @bind="formType">
+                    <option value="@DebtType.Payable">بدهی (ما بدهکاریم)</option>
+                    <option value="@DebtType.Receivable">طلب (ما طلبکاریم)</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">عنوان</label>
+                <input class="form-control" @bind="formTitle" placeholder="مثلاً: بابت خرید روغن از آقای احمدی" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">طرف حساب</label>
+                <select class="form-select" @bind="formPartyId">
+                    <option value="0">— بدون طرف حساب —</option>
+                    @foreach (var p in parties)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">مبلغ کل (ریال)</label>
+                <input class="form-control" dir="ltr" @bind="formAmount" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">مبلغ پرداخت‌شده تا حالا</label>
+                <input class="form-control" dir="ltr" @bind="formPaid" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تاریخ ایجاد</label>
+                <input type="date" class="form-control" @bind="formIssueDate" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">سررسید (اختیاری)</label>
+                <input type="date" class="form-control" @bind="formDueDate" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">توضیح</label>
+                <input class="form-control" @bind="formNotes" />
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
+                    @(editing is null ? "ثبت مورد مالی" : "ذخیره تغییرات")
+                </button>
+                @if (editing is not null)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@busy">انصراف</button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">جستجو</label>
+                <input class="form-control" @bind="search" @bind:after="LoadAsync" placeholder="عنوان، طرف حساب یا توضیح..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نوع</label>
+                <select class="form-select" @bind="filterType" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    <option value="@DebtType.Payable">بدهی</option>
+                    <option value="@DebtType.Receivable">طلب</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">وضعیت</label>
+                <select class="form-select" @bind="filterStatus" @bind:after="LoadAsync">
+                    <option value="open">باز</option>
+                    <option value="settled">تسویه‌شده</option>
+                    <option value="all">همه</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="overdueOnly" @bind="overdueOnly" @bind:after="LoadAsync" />
+                    <label class="form-check-label" for="overdueOnly">فقط سررسید گذشته</label>
+                </div>
+            </div>
+            <div class="col-md-2 text-end">
+                <button class="btn btn-success w-100" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-excel"></i>
+                        <span>Excel</span>
+                    }
+                </button>
+            </div>
+        </div>
+        <div class="text-muted small mt-2">
+            @items.Count.ToString("N0", Fa) مورد — جمع مانده: @Money(items.Sum(i => i.Remaining)) — جمع کل: @Money(items.Sum(i => i.Amount))
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>نوع</th>
+                        <th>عنوان</th>
+                        <th>طرف حساب</th>
+                        <th>مبلغ کل</th>
+                        <th>پرداخت‌شده</th>
+                        <th>مانده</th>
+                        <th>سررسید</th>
+                        <th>وضعیت</th>
+                        <th style="width:260px">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">موردی برای نمایش نیست.</td>
+                        </tr>
+                    }
+                    @foreach (var item in items)
+                    {
+                        <tr class="@(item.IsOverdue ? "table-warning" : "")">
+                            <td><span class="badge @item.TypeBadge">@item.TypeTitle</span></td>
+                            <td>
+                                <div>@item.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <div class="text-muted small">@item.Notes</div>
+                                }
+                            </td>
+                            <td class="small">
+                                @if (item.PartyId.HasValue)
+                                {
+                                    <a href="@($"crm/parties/{item.PartyId}")">@(item.Party?.Name ?? "—")</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="small">@Money(item.Amount)</td>
+                            <td class="small" style="min-width:120px">
+                                <div>@Money(item.PaidAmount)</div>
+                                <div style="background:rgba(128,128,128,.15);border-radius:6px;height:8px;overflow:hidden;margin-top:4px;">
+                                    <div class="bg-success" style="width:@((int)item.PaidPercent)%;height:100%;"></div>
+                                </div>
+                            </td>
+                            <td class="fw-bold">@Money(item.Remaining)</td>
+                            <td class="small" dir="ltr">
+                                @PersianDate.OrDash(item.DueDate)
+                                @if (item.IsOverdue)
+                                {
+                                    <div><span class="badge bg-danger">گذشته</span></div>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @item.StatusBadge">@item.StatusTitle</span>
+                                @if (item.SettledAt.HasValue)
+                                {
+                                    <div class="text-muted small" dir="ltr">@PersianDate.ToDate(item.SettledAt.Value)</div>
+                                }
+                            </td>
+                            <td>
+                                @if (CanManage && !item.IsSettled)
+                                {
+                                    @if (payingId == item.Id)
+                                    {
+                                        <div class="d-flex gap-1">
+                                            <input class="form-control form-control-sm" dir="ltr" style="width:110px" @bind="payAmount" />
+                                            <button class="btn btn-sm btn-success" @onclick="() => RegisterPaymentAsync(item)">
+                                                ثبت
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelPayment">
+                                                انصراف
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-success me-1" @onclick="() => StartPayment(item)">پرداخت</button>
+                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ConfirmSettle(item)">تسویهٔ کامل</button>
+                                    }
+                                }
+                                @if (CanManage)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(item)">ویرایش</button>
+                                }
+                                @if (CanDelete)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool CanDelete;
+    private bool CanExport;
+
+    private List<Party> parties = new();
+    private List<Debt> items = new();
+    private List<Debt> all = new();
+    private Debt? editing;
+
+    private decimal statPayable;
+    private decimal statReceivable;
+    private int statPayableCount;
+    private int statReceivableCount;
+    private int statOverdueCount;
+
+    private string search = string.Empty;
+    private int filterType;
+    private string filterStatus = "open";
+    private bool overdueOnly;
+
+    private int payingId;
+    private string payAmount = "0";
+
+    private DebtType formType = DebtType.Payable;
+    private string formTitle = string.Empty;
+    private int formPartyId;
+    private string formAmount = "0";
+    private string formPaid = "0";
+    private DateTime formIssueDate = DateTime.Today;
+    private DateTime? formDueDate;
+    private string? formNotes;
+
+    private bool busy;
+    private bool isExporting;
+    private string? currentUsername;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewFinance);
+        CanManage = await Access.HasAsync(user, Permissions.ManageFinance);
+        CanDelete = await Access.HasAsync(user, Permissions.DeleteFinance);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        parties = await Db.Parties.Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        all = await Db.Debts.Include(d => d.Party).ToListAsync();
+
+        var open = all.Where(d => !d.IsSettled).ToList();
+        statPayable = open.Where(d => d.Type == DebtType.Payable).Sum(d => d.Remaining);
+        statReceivable = open.Where(d => d.Type == DebtType.Receivable).Sum(d => d.Remaining);
+        statPayableCount = open.Count(d => d.Type == DebtType.Payable);
+        statReceivableCount = open.Count(d => d.Type == DebtType.Receivable);
+        statOverdueCount = open.Count(d => d.IsOverdue);
+
+        var query = all.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(d => d.Title.Contains(term)
+                                     || (d.Notes != null && d.Notes.Contains(term))
+                                     || (d.Party != null && d.Party.Name.Contains(term)));
+        }
+
+        if (filterType > 0)
+        {
+            var type = (DebtType)filterType;
+            query = query.Where(d => d.Type == type);
+        }
+
+        query = filterStatus switch
+        {
+            "open" => query.Where(d => !d.IsSettled),
+            "settled" => query.Where(d => d.IsSettled),
+            _ => query
+        };
+
+        if (overdueOnly)
+        {
+            query = query.Where(d => d.IsOverdue);
+        }
+
+        items = query
+            .OrderBy(d => d.IsSettled ? 1 : 0)
+            .ThenBy(d => d.DueDate ?? DateTime.MaxValue)
+            .ThenByDescending(d => d.IssueDate)
+            .Take(300)
+            .ToList();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(formTitle))
+        {
+            Toasts.ShowError("عنوان را وارد کنید");
+            return;
+        }
+
+        var amount = ParseNum(formAmount);
+        var paid = ParseNum(formPaid);
+
+        if (amount <= 0)
+        {
+            Toasts.ShowError("مبلغ کل باید بزرگ‌تر از صفر باشد");
+            return;
+        }
+
+        if (paid < 0)
+        {
+            Toasts.ShowError("مبلغ پرداخت‌شده نمی‌تواند منفی باشد");
+            return;
+        }
+
+        if (paid > amount)
+        {
+            Toasts.ShowError("مبلغ پرداخت‌شده از مبلغ کل بیشتر است");
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            if (editing is null)
+            {
+                var item = new Debt
+                {
+                    Type = formType,
+                    PartyId = formPartyId > 0 ? formPartyId : null,
+                    Title = formTitle.Trim(),
+                    Amount = amount,
+                    PaidAmount = paid,
+                    IssueDate = formIssueDate.Date,
+                    DueDate = formDueDate?.Date,
+                    Notes = NullIfEmpty(formNotes),
+                    Username = currentUsername
+                };
+
+                item.Status = item.Remaining <= 0 ? DebtStatus.Settled : DebtStatus.Open;
+                item.SettledAt = item.Status == DebtStatus.Settled ? DateTime.Now : null;
+
+                Db.Debts.Add(item);
+                await Db.SaveChangesAsync();
+                await AuditAsync("افزودن", item.TypeTitle, item.Id,
+                    $"{item.TypeTitle} «{item.Title}» به مبلغ {Money(item.Amount)} ثبت شد");
+                Toasts.ShowSuccess($"{item.TypeTitle} ثبت شد");
+            }
+            else
+            {
+                editing.Type = formType;
+                editing.PartyId = formPartyId > 0 ? formPartyId : null;
+                editing.Title = formTitle.Trim();
+                editing.Amount = amount;
+                editing.PaidAmount = paid;
+                editing.IssueDate = formIssueDate.Date;
+                editing.DueDate = formDueDate?.Date;
+                editing.Notes = NullIfEmpty(formNotes);
+
+                editing.Status = editing.Remaining <= 0 ? DebtStatus.Settled : DebtStatus.Open;
+                editing.SettledAt = editing.Status == DebtStatus.Settled ? DateTime.Now : null;
+
+                await Db.SaveChangesAsync();
+                await AuditAsync("ویرایش", editing.TypeTitle, editing.Id, $"{editing.TypeTitle} «{editing.Title}» ویرایش شد");
+                Toasts.ShowSuccess("تغییرات ذخیره شد");
+            }
+
+            CancelEdit();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void StartEdit(Debt item)
+    {
+        editing = item;
+        formType = item.Type;
+        formTitle = item.Title;
+        formPartyId = item.PartyId ?? 0;
+        formAmount = item.Amount.ToString(CultureInfo.InvariantCulture);
+        formPaid = item.PaidAmount.ToString(CultureInfo.InvariantCulture);
+        formIssueDate = item.IssueDate;
+        formDueDate = item.DueDate;
+        formNotes = item.Notes;
+        CancelPayment();
+    }
+
+    private void CancelEdit()
+    {
+        editing = null;
+        formType = DebtType.Payable;
+        formTitle = string.Empty;
+        formPartyId = 0;
+        formAmount = "0";
+        formPaid = "0";
+        formIssueDate = DateTime.Today;
+        formDueDate = null;
+        formNotes = null;
+    }
+
+    private void StartPayment(Debt item)
+    {
+        payingId = item.Id;
+        payAmount = item.Remaining.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private void CancelPayment()
+    {
+        payingId = 0;
+        payAmount = "0";
+    }
+
+    private async Task RegisterPaymentAsync(Debt item)
+    {
+        try
+        {
+            busy = true;
+
+            var amount = ParseNum(payAmount);
+            var result = await FinanceService.RegisterPaymentAsync(Db, item.Id, amount, currentUsername);
+
+            if (result.Ok)
+            {
+                Toasts.ShowSuccess(result.Message);
+                CancelPayment();
+                await LoadAsync();
+            }
+            else
+            {
+                Toasts.ShowError(result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ثبت پرداخت: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task ConfirmSettle(Debt item)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm",
+            $"تسویهٔ کامل «{item.Title}» با مبلغ {item.Remaining:N0} ریال ثبت شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            var result = await FinanceService.RegisterPaymentAsync(Db, item.Id, item.Remaining, currentUsername);
+
+            if (result.Ok)
+            {
+                Toasts.ShowSuccess(result.Message);
+                await LoadAsync();
+            }
+            else
+            {
+                Toasts.ShowError(result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(Debt item)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"{item.TypeTitle} «{item.Title}» حذف شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            Db.Debts.Remove(item);
+            await Db.SaveChangesAsync();
+            await AuditAsync("حذف", item.TypeTitle, item.Id, $"{item.TypeTitle} «{item.Title}» به مبلغ {Money(item.Amount)} حذف شد");
+            Toasts.ShowSuccess("مورد مالی حذف شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = items.ToList();
+            if (data.Count == 0)
+            {
+                Toasts.ShowError("داده‌ای برای خروجی وجود ندارد");
+                return;
+            }
+
+            var columns = new Dictionary<string, Func<Debt, object?>>
+            {
+                ["نوع"] = d => d.TypeTitle,
+                ["عنوان"] = d => d.Title,
+                ["طرف حساب"] = d => d.Party?.Name,
+                ["مبلغ کل"] = d => d.Amount.ToString("N0", CultureInfo.InvariantCulture),
+                ["پرداخت‌شده"] = d => d.PaidAmount.ToString("N0", CultureInfo.InvariantCulture),
+                ["مانده"] = d => d.Remaining.ToString("N0", CultureInfo.InvariantCulture),
+                ["تاریخ ایجاد"] = d => d.IssueDate,
+                ["سررسید"] = d => d.DueDate,
+                ["وضعیت"] = d => d.StatusTitle,
+                ["تاریخ تسویه"] = d => d.SettledAt,
+                ["توضیح"] = d => d.Notes,
+                ["ثبت‌کننده"] = d => d.Username
+            };
+
+            var now = DateTime.Now;
+            var title = $"بدهی و طلب  |  تاریخ: {PersianDate.ToDate(now)}  |  تعداد: {data.Count}  |  جمع مانده: {Money(data.Sum(d => d.Remaining))}";
+
+            var bytes = Excel.Export(data, "بدهی و طلب", columns, title);
+            var fileName = $"Debts_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {data.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static decimal ParseNum(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return 0m;
+        }
+
+        var clean = text.Trim().Replace("٫", ".").Replace("٬", "").Replace(",", "");
+
+        return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 0m;
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = currentUsername
+        });
+
+        await Db.SaveChangesAsync();
+    }
+}

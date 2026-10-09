@@ -108,6 +108,38 @@
             </div>
         }
 
+        @* ===== بخش مالی ===== *@
+        @if (canViewFinance)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="finance" Match="NavLinkMatch.All">
+                    <span class="bi bi-cash-coin me-2" aria-hidden="true"></span>
+                    وضعیت مالی
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="finance/cheques">
+                    <span class="bi bi-journal-check me-2" aria-hidden="true"></span>
+                    چک و سفته
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="finance/debts">
+                    <span class="bi bi-arrow-left-right me-2" aria-hidden="true"></span>
+                    بدهی و طلب
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="finance/expenses">
+                    <span class="bi bi-wallet2 me-2" aria-hidden="true"></span>
+                    هزینه‌ها
+                </NavLink>
+            </div>
+        }
+
         @* ===== آیتم‌های مدیریتی (بر اساس اختیار کاربر) ===== *@
         @if (canManageEmployees)
         {
@@ -129,7 +161,15 @@
             </div>
         }
 
-        @if (canManageRoles)         {             <div class="nav-item px-3">                 <NavLink class="nav-link" href="roles">                     <span class="bi bi-shield-lock-fill me-2" aria-hidden="true"></span>                     نقش‌ها و دسترسی‌ها                 </NavLink>             </div>         }
+        @if (canManageRoles)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="roles">
+                    <span class="bi bi-shield-lock-fill me-2" aria-hidden="true"></span>
+                    نقش‌ها و دسترسی‌ها
+                </NavLink>
+            </div>
+        }
 
     </nav>
 </div>
@@ -140,6 +180,7 @@
     private bool canViewAuditLog;
     private bool canViewParties;
     private bool canViewCrm;
+    private bool canViewFinance;
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,5 +192,6 @@
         canViewAuditLog = (permissions & Permissions.ViewAuditLog) == Permissions.ViewAuditLog;
         canViewParties = (permissions & Permissions.ViewParties) == Permissions.ViewParties;
         canViewCrm = (permissions & Permissions.ViewCrm) == Permissions.ViewCrm;
+        canViewFinance = (permissions & Permissions.ViewFinance) == Permissions.ViewFinance;
     }
 }

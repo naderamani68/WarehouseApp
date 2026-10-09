@@ -80,6 +80,66 @@ namespace WarehouseApp.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.Cheque", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("PartyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Serial")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DueDate");
+
+                    b.HasIndex("PartyId");
+
+                    b.ToTable("Cheques");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.CrmInteraction", b =>
                 {
                     b.Property<int>("Id")
@@ -175,6 +235,61 @@ namespace WarehouseApp.Migrations
                     b.ToTable("CrmOpportunities");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.Debt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("PartyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartyId");
+
+                    b.ToTable("Debts");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.Employee", b =>
                 {
                     b.Property<int>("Id")
@@ -243,6 +358,62 @@ namespace WarehouseApp.Migrations
                         .IsUnique();
 
                     b.ToTable("Employees");
+                });
+
+            modelBuilder.Entity("WarehouseApp.Data.Expense", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("PartyId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("Expenses");
                 });
 
             modelBuilder.Entity("WarehouseApp.Data.Party", b =>
@@ -383,7 +554,7 @@ namespace WarehouseApp.Migrations
                             IsActive = true,
                             IsSystemRole = true,
                             Name = "مدیر انبار",
-                            Permissions = 1045503
+                            Permissions = 8385535
                         },
                         new
                         {
@@ -549,6 +720,16 @@ namespace WarehouseApp.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.Cheque", b =>
+                {
+                    b.HasOne("WarehouseApp.Data.Party", "Party")
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Party");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.CrmInteraction", b =>
                 {
                     b.HasOne("WarehouseApp.Data.Party", "Party")
@@ -571,6 +752,16 @@ namespace WarehouseApp.Migrations
                     b.Navigation("Party");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.Debt", b =>
+                {
+                    b.HasOne("WarehouseApp.Data.Party", "Party")
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Party");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.Employee", b =>
                 {
                     b.HasOne("WarehouseApp.Data.Role", "Role")
@@ -579,6 +770,23 @@ namespace WarehouseApp.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("WarehouseApp.Data.Expense", b =>
+                {
+                    b.HasOne("WarehouseApp.Data.Party", "Party")
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("WarehouseApp.Data.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Party");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("WarehouseApp.Data.Product", b =>

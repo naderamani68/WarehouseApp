@@ -1,0 +1,435 @@
+﻿@page "/finance"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>وضعیت مالی | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">💰 وضعیت مالی</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else if (stats is null)
+{
+    <div class="text-muted">در حال بارگذاری…</div>
+}
+else
+{
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <a class="btn btn-sm btn-outline-primary" href="finance/cheques">🧾 چک و سفته</a>
+        <a class="btn btn-sm btn-outline-primary" href="finance/debts">🤝 بدهی و طلب</a>
+        <a class="btn btn-sm btn-outline-primary" href="finance/expenses">💸 هزینه‌ها</a>
+        <button class="btn btn-sm btn-success ms-auto" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">ماندهٔ تقریبی</div>
+                <div class="fs-5 fw-bold @(stats.EstimatedBalance >= 0 ? "text-success" : "text-danger")">
+                    @Money(stats.EstimatedBalance)
+                </div>
+                <div class="text-muted small">فروش − هزینه + طلب − بدهی</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">فروش تأییدشده</div>
+                <div class="fs-5 fw-bold">@Money(stats.SaleValue)</div>
+                <div class="text-muted small">@stats.ConfirmedOrders.ToString("N0", Fa) سفارش</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">جمع هزینه‌ها</div>
+                <div class="fs-5 fw-bold text-danger">@Money(stats.ExpenseTotal)</div>
+                <div class="text-muted small">@stats.ExpenseCount.ToString("N0", Fa) مورد</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">هزینهٔ این ماه</div>
+                <div class="fs-5 fw-bold">@Money(stats.ExpenseThisMonth)</div>
+                <div class="text-muted small">امسال: @Money(stats.ExpenseThisYear)</div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">چک و سفتهٔ دریافتی (در جریان)</div>
+                <div class="fs-5 fw-bold text-success">@Money(stats.PendingIncomingAmount)</div>
+                <div class="text-muted small">@stats.PendingIncomingCount.ToString("N0", Fa) فقره</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">چک و سفتهٔ پرداختی (در جریان)</div>
+                <div class="fs-5 fw-bold text-danger">@Money(stats.PendingOutgoingAmount)</div>
+                <div class="text-muted small">@stats.PendingOutgoingCount.ToString("N0", Fa) فقره</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">سررسید گذشته</div>
+                <div class="fs-5 fw-bold @(stats.OverdueChequeCount > 0 ? "text-danger" : "")">
+                    @stats.OverdueChequeCount.ToString("N0", Fa) فقره
+                </div>
+                <div class="text-muted small">@Money(stats.OverdueChequeAmount)</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">برگشتی</div>
+                <div class="fs-5 fw-bold @(stats.ReturnedChequeCount > 0 ? "text-danger" : "")">
+                    @stats.ReturnedChequeCount.ToString("N0", Fa) فقره
+                </div>
+                <div class="text-muted small">نیاز به پیگیری</div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">طلب ما از دیگران (باز)</div>
+                <div class="fs-5 fw-bold text-success">@Money(stats.OpenReceivableAmount)</div>
+                <div class="text-muted small">@stats.OpenReceivableCount.ToString("N0", Fa) مورد</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">بدهی ما به دیگران (باز)</div>
+                <div class="fs-5 fw-bold text-danger">@Money(stats.OpenPayableAmount)</div>
+                <div class="text-muted small">
+                    @stats.OpenPayableCount.ToString("N0", Fa) مورد
+                    @if (stats.OverdueDebtCount > 0)
+                    {
+                        <span class="text-danger"> — سررسید گذشته: @stats.OverdueDebtCount</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">📅 هزینهٔ شش ماه گذشته</h6>
+                @if (stats.Monthly.All(x => x.Amount == 0))
+                {
+                    <div class="text-muted small">هنوز هزینه‌ای ثبت نشده است.</div>
+                }
+                else
+                {
+                    @foreach (var month in stats.Monthly)
+                    {
+                        var percent = maxMonth <= 0 ? 0 : (int)Math.Round(month.Amount / maxMonth * 100);
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>@month.Title @month.Year.ToString("N0", Fa)</span>
+                                <span class="fw-bold">@Money(month.Amount)</span>
+                            </div>
+                            <div style="background:rgba(128,128,128,.15);border-radius:8px;height:14px;overflow:hidden;">
+                                <div class="bg-primary" style="width:@(percent)%;height:100%;"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">🗂️ هزینه به تفکیک دسته</h6>
+                @if (stats.ByCategory.Count == 0)
+                {
+                    <div class="text-muted small">هنوز هزینه‌ای ثبت نشده است.</div>
+                }
+                else
+                {
+                    @foreach (var row in stats.ByCategory)
+                    {
+                        var percent = stats.ExpenseTotal <= 0 ? 0 : (int)Math.Round(row.Amount / stats.ExpenseTotal * 100);
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span><i class="bi @row.Icon me-1"></i>@row.Title <span class="text-muted">(@row.Count.ToString("N0", Fa) مورد)</span></span>
+                                <span class="fw-bold">@Money(row.Amount) <span class="text-muted">— @percent.ToString("N0", Fa)٪</span></span>
+                            </div>
+                            <div style="background:rgba(128,128,128,.15);border-radius:8px;height:14px;overflow:hidden;">
+                                <div class="@row.Badge" style="width:@(percent)%;height:100%;"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">⏰ سررسیدهای گذشته و نزدیک</h6>
+                @if (stats.DueSoonList.Count == 0)
+                {
+                    <div class="text-muted small">سند در جریانی وجود ندارد.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>نوع</th>
+                                <th>طرف حساب</th>
+                                <th>مبلغ</th>
+                                <th>سررسید</th>
+                                <th>وضعیت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in stats.DueSoonList)
+                            {
+                                <tr class="@(item.IsOverdue ? "table-danger" : item.IsDueToday ? "table-warning" : "")">
+                                    <td class="small">
+                                        @item.KindTitle
+                                        <span class="badge @item.DirectionBadge ms-1">@item.DirectionTitle</span>
+                                    </td>
+                                    <td class="small">@(item.Party?.Name ?? "—")</td>
+                                    <td class="small fw-bold">@Money(item.Amount)</td>
+                                    <td class="small" dir="ltr">@PersianDate.ToDate(item.DueDate)</td>
+                                    <td class="small">
+                                        @if (item.IsOverdue)
+                                        {
+                                            <span class="badge bg-danger">@Math.Abs(item.DaysLeft).ToString("N0", Fa) روز گذشته</span>
+                                        }
+                                        else if (item.IsDueToday)
+                                        {
+                                            <span class="badge bg-warning text-dark">امروز</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">@item.DaysLeft.ToString("N0", Fa) روز مانده</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                <div class="mt-2">
+                    <a class="btn btn-sm btn-outline-secondary" href="finance/cheques">همهٔ اسناد مالی</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">🤝 بدهی و طلب باز</h6>
+                @if (stats.OpenDebtList.Count == 0)
+                {
+                    <div class="text-muted small">مورد بازی وجود ندارد.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>نوع</th>
+                                <th>عنوان</th>
+                                <th>طرف حساب</th>
+                                <th>مانده</th>
+                                <th>سررسید</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in stats.OpenDebtList)
+                            {
+                                <tr class="@(item.IsOverdue ? "table-warning" : "")">
+                                    <td><span class="badge @item.TypeBadge">@item.TypeTitle</span></td>
+                                    <td class="small">@item.Title</td>
+                                    <td class="small">@(item.Party?.Name ?? "—")</td>
+                                    <td class="small fw-bold">@Money(item.Remaining)</td>
+                                    <td class="small text-muted" dir="ltr">@PersianDate.OrDash(item.DueDate)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                <div class="mt-2">
+                    <a class="btn btn-sm btn-outline-secondary" href="finance/debts">همهٔ بدهی و طلب‌ها</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card p-3">
+                <h6 class="mb-3">📦 هزینهٔ هر کالا (به ترتیب مبلغ)</h6>
+                @if (stats.ProductCosts.Count == 0)
+                {
+                    <div class="text-muted small">
+                        هنوز هزینه‌ای به یک کالا وصل نشده است. در صفحهٔ هزینه‌ها، هنگام ثبت هزینهٔ خرید، کالا را انتخاب کنید.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>کالا</th>
+                                    <th>تعداد خریداری‌شده</th>
+                                    <th>جمع هزینه</th>
+                                    <th>میانگین بهای واحد</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in stats.ProductCosts)
+                                {
+                                    <tr>
+                                        <td>@item.ProductName</td>
+                                        <td>@item.Quantity.ToString("N0", Fa)</td>
+                                        <td class="fw-bold">@Money(item.Amount)</td>
+                                        <td>
+                                            @if (item.Quantity > 0)
+                                            {
+                                                @Money(Math.Round(item.Amount / item.Quantity, 0))
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanExport;
+    private bool isExporting;
+    private FinanceStats? stats;
+
+    private decimal maxMonth => stats is null || stats.Monthly.Count == 0
+        ? 0m
+        : stats.Monthly.Max(m => m.Amount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewFinance);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        stats = await FinanceService.GetStatsAsync(Db);
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        if (stats is null)
+        {
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var rows = new List<SummaryRow>
+            {
+                new("ماندهٔ تقریبی", Money(stats.EstimatedBalance)),
+                new("فروش تأییدشده", $"{Money(stats.SaleValue)} ({stats.ConfirmedOrders.ToString("N0", Fa)} سفارش)"),
+                new("جمع هزینه‌ها", $"{Money(stats.ExpenseTotal)} ({stats.ExpenseCount.ToString("N0", Fa)} مورد)"),
+                new("هزینهٔ این ماه", Money(stats.ExpenseThisMonth)),
+                new("هزینهٔ امسال", Money(stats.ExpenseThisYear)),
+                new("چک و سفتهٔ دریافتی در جریان", $"{Money(stats.PendingIncomingAmount)} ({stats.PendingIncomingCount.ToString("N0", Fa)} فقره)"),
+                new("چک و سفتهٔ پرداختی در جریان", $"{Money(stats.PendingOutgoingAmount)} ({stats.PendingOutgoingCount.ToString("N0", Fa)} فقره)"),
+                new("چک و سفتهٔ سررسید گذشته", $"{Money(stats.OverdueChequeAmount)} ({stats.OverdueChequeCount.ToString("N0", Fa)} فقره)"),
+                new("چک برگشتی", stats.ReturnedChequeCount.ToString("N0", Fa) + " فقره"),
+                new("طلب ما (باز)", $"{Money(stats.OpenReceivableAmount)} ({stats.OpenReceivableCount.ToString("N0", Fa)} مورد)"),
+                new("بدهی ما (باز)", $"{Money(stats.OpenPayableAmount)} ({stats.OpenPayableCount.ToString("N0", Fa)} مورد)")
+            };
+
+            foreach (var month in stats.Monthly)
+            {
+                rows.Add(new SummaryRow($"هزینهٔ {month.Title} {month.Year.ToString("N0", Fa)}", Money(month.Amount)));
+            }
+
+            foreach (var row in stats.ByCategory)
+            {
+                rows.Add(new SummaryRow($"هزینهٔ دستهٔ {row.Title}", $"{Money(row.Amount)} ({row.Count.ToString("N0", Fa)} مورد)"));
+            }
+
+            foreach (var item in stats.ProductCosts)
+            {
+                rows.Add(new SummaryRow($"هزینهٔ کالای {item.ProductName}", $"{Money(item.Amount)} ({item.Quantity.ToString("N0", Fa)} عدد)"));
+            }
+
+            var columns = new Dictionary<string, Func<SummaryRow, object?>>
+            {
+                ["شاخص"] = r => r.Title,
+                ["مقدار"] = r => r.Value
+            };
+
+            var now = DateTime.Now;
+            var title = $"وضعیت مالی  |  تاریخ: {PersianDate.ToDate(now)}";
+
+            var bytes = Excel.Export(rows, "وضعیت مالی", columns, title);
+            var fileName = $"Finance_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {rows.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private record SummaryRow(string Title, string Value);
+}

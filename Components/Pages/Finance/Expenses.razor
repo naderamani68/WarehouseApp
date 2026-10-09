@@ -1,0 +1,692 @@
+﻿@page "/finance/expenses"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>هزینه‌ها | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">💸 هزینه‌ها</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "ثبت هزینهٔ جدید" : $"ویرایش هزینه: {editing.Title}")</h5>
+
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">دستهٔ هزینه</label>
+                <select class="form-select" @bind="formCategory">
+                    <option value="@ExpenseCategory.ProductPurchase">خرید کالا</option>
+                    <option value="@ExpenseCategory.Service">خرید خدمات</option>
+                    <option value="@ExpenseCategory.Shipping">حمل و نقل</option>
+                    <option value="@ExpenseCategory.Rent">اجاره</option>
+                    <option value="@ExpenseCategory.Salary">حقوق و دستمزد</option>
+                    <option value="@ExpenseCategory.Tax">مالیات و عوارض</option>
+                    <option value="@ExpenseCategory.Repair">تعمیرات و نگهداری</option>
+                    <option value="@ExpenseCategory.Utilities">آب و برق و گاز</option>
+                    <option value="@ExpenseCategory.Misc">متفرقه</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">شرح هزینه</label>
+                <input class="form-control" @bind="formTitle" placeholder="مثلاً: خرید ۲۰ کارتن روغن" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">مبلغ (ریال)</label>
+                <input class="form-control" dir="ltr" @bind="formAmount" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تاریخ</label>
+                <input type="date" class="form-control" @bind="formAt" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">روش پرداخت</label>
+                <select class="form-select" @bind="formMethod">
+                    <option value="@PaymentMethod.Cash">نقد</option>
+                    <option value="@PaymentMethod.Card">کارت بانکی</option>
+                    <option value="@PaymentMethod.Transfer">حواله / انتقال</option>
+                    <option value="@PaymentMethod.Cheque">چک</option>
+                    <option value="@PaymentMethod.Other">سایر</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">طرف حساب (فروشنده / پیمانکار)</label>
+                <select class="form-select" @bind="formPartyId">
+                    <option value="0">— بدون طرف حساب —</option>
+                    @foreach (var p in parties)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">کالای مرتبط (اختیاری)</label>
+                <select class="form-select" @bind="formProductId">
+                    <option value="0">— بدون کالا —</option>
+                    @foreach (var p in products)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تعداد خریداری‌شده (اختیاری)</label>
+                <input class="form-control" dir="ltr" @bind="formQuantity" />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">توضیح</label>
+                <input class="form-control" @bind="formNotes" />
+            </div>
+
+            <div class="col-12 d-flex gap-2 align-items-center">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
+                    @(editing is null ? "ثبت هزینه" : "ذخیره تغییرات")
+                </button>
+                @if (editing is not null)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@busy">انصراف</button>
+                }
+                @if (formUnitCost is not null)
+                {
+                    <span class="text-muted small">بهای واحد: @Money(formUnitCost.Value)</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">جمع هزینهٔ این ماه</div>
+                <div class="fs-5 fw-bold text-danger">@Money(statThisMonth)</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">جمع هزینهٔ امسال</div>
+                <div class="fs-5 fw-bold">@Money(statThisYear)</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">جمع هزینه‌های نمایش‌داده‌شده</div>
+                <div class="fs-5 fw-bold">@Money(items.Sum(i => i.Amount))</div>
+                <div class="text-muted small">@items.Count.ToString("N0", Fa) مورد</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">بیشترین دسته</div>
+                @if (topCategory is null)
+                {
+                    <div class="fs-6 fw-bold">—</div>
+                }
+                else
+                {
+                    <div class="fs-6 fw-bold"><i class="bi @topCategory.Icon me-1"></i>@topCategory.Title</div>
+                    <div class="text-muted small">@Money(topCategory.Amount)</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">جستجو</label>
+                <input class="form-control" @bind="search" @bind:after="LoadAsync" placeholder="شرح، طرف حساب یا توضیح..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">دسته</label>
+                <select class="form-select" @bind="filterCategory" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    <option value="@ExpenseCategory.ProductPurchase">خرید کالا</option>
+                    <option value="@ExpenseCategory.Service">خرید خدمات</option>
+                    <option value="@ExpenseCategory.Shipping">حمل و نقل</option>
+                    <option value="@ExpenseCategory.Rent">اجاره</option>
+                    <option value="@ExpenseCategory.Salary">حقوق و دستمزد</option>
+                    <option value="@ExpenseCategory.Tax">مالیات و عوارض</option>
+                    <option value="@ExpenseCategory.Repair">تعمیرات و نگهداری</option>
+                    <option value="@ExpenseCategory.Utilities">آب و برق و گاز</option>
+                    <option value="@ExpenseCategory.Misc">متفرقه</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">کالا</label>
+                <select class="form-select" @bind="filterProductId" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    @foreach (var p in products)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">از تاریخ</label>
+                <input type="date" class="form-control" @bind="fromDate" @bind:after="LoadAsync" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">تا تاریخ</label>
+                <input type="date" class="form-control" @bind="toDate" @bind:after="LoadAsync" />
+            </div>
+            <div class="col-md-1 text-end">
+                <button class="btn btn-success w-100" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-excel"></i>
+                    }
+                </button>
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">پاک کردن فیلترها</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="SetThisMonth">هزینهٔ این ماه</button>
+        </div>
+    </div>
+
+    @if (byCategory.Count > 0)
+    {
+        <div class="card p-3 mb-3">
+            <h6 class="mb-3">هزینه به تفکیک دسته (مجموعهٔ نمایش‌داده‌شده)</h6>
+            @foreach (var row in byCategory)
+            {
+                var percent = items.Sum(i => i.Amount) <= 0 ? 0 : (int)Math.Round(row.Amount / items.Sum(i => i.Amount) * 100);
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span><i class="bi @row.Icon me-1"></i>@row.Title <span class="text-muted">(@row.Count.ToString("N0", Fa) مورد)</span></span>
+                        <span class="fw-bold">@Money(row.Amount)</span>
+                    </div>
+                    <div style="background:rgba(128,128,128,.15);border-radius:8px;height:12px;overflow:hidden;">
+                        <div class="@row.Badge" style="width:@(percent)%;height:100%;"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>تاریخ</th>
+                        <th>دسته</th>
+                        <th>شرح</th>
+                        <th>طرف حساب</th>
+                        <th>کالا</th>
+                        <th>روش پرداخت</th>
+                        <th>مبلغ</th>
+                        <th>بهای واحد</th>
+                        <th style="width:170px">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">هزینه‌ای برای نمایش نیست.</td>
+                        </tr>
+                    }
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td class="small" dir="ltr">@PersianDate.ToDate(item.At)</td>
+                            <td><span class="badge @item.CategoryBadge"><i class="bi @item.CategoryIcon me-1"></i>@item.CategoryTitle</span></td>
+                            <td>
+                                <div>@item.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <div class="text-muted small">@item.Notes</div>
+                                }
+                            </td>
+                            <td class="small">
+                                @if (item.PartyId.HasValue)
+                                {
+                                    <a href="@($"crm/parties/{item.PartyId}")">@(item.Party?.Name ?? "—")</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="small">
+                                @if (item.ProductId.HasValue)
+                                {
+                                    <span>@(item.Product?.Name ?? "—")</span>
+                                    @if (item.Quantity.HasValue)
+                                    {
+                                        <span class="text-muted">(@item.Quantity.Value.ToString("N0", Fa) عدد)</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="small">@item.MethodTitle</td>
+                            <td class="fw-bold">@Money(item.Amount)</td>
+                            <td class="small">
+                                @if (item.UnitCost.HasValue)
+                                {
+                                    @Money(item.UnitCost.Value)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (CanManage)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(item)">ویرایش</button>
+                                }
+                                @if (CanDelete)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                @if (items.Count > 0)
+                {
+                    <tfoot>
+                        <tr>
+                            <td colspan="6" class="text-end fw-bold">جمع:</td>
+                            <td class="fw-bold text-danger">@Money(items.Sum(i => i.Amount))</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool CanDelete;
+    private bool CanExport;
+
+    private List<Party> parties = new();
+    private List<Product> products = new();
+    private List<Expense> items = new();
+    private List<FinanceCategoryStat> byCategory = new();
+    private Expense? editing;
+
+    private decimal statThisMonth;
+    private decimal statThisYear;
+
+    private string search = string.Empty;
+    private int filterCategory;
+    private int filterProductId;
+    private DateTime? fromDate;
+    private DateTime? toDate;
+
+    private ExpenseCategory formCategory = ExpenseCategory.ProductPurchase;
+    private PaymentMethod formMethod = PaymentMethod.Cash;
+    private string formTitle = string.Empty;
+    private string formAmount = "0";
+    private DateTime formAt = DateTime.Today;
+    private int formPartyId;
+    private int formProductId;
+    private string? formQuantity;
+    private string? formNotes;
+
+    private bool busy;
+    private bool isExporting;
+    private string? currentUsername;
+
+    private FinanceCategoryStat? topCategory => byCategory.FirstOrDefault();
+
+    private decimal? formUnitCost
+    {
+        get
+        {
+            var amount = ParseNum(formAmount);
+            var quantity = ParseNum(formQuantity);
+            return quantity > 0 && amount > 0 ? Math.Round(amount / quantity, 0) : null;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewFinance);
+        CanManage = await Access.HasAsync(user, Permissions.ManageFinance);
+        CanDelete = await Access.HasAsync(user, Permissions.DeleteFinance);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        parties = await Db.Parties.Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync();
+        products = await Db.Products.OrderBy(p => p.Name).ToListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var all = await Db.Expenses
+            .Include(e => e.Party)
+            .Include(e => e.Product)
+            .ToListAsync();
+
+        var today = DateTime.Today;
+        var persianYear = FinanceService.PersianYearOf(today);
+
+        var calendar = new PersianCalendar();
+        var currentMonth = calendar.GetMonth(today);
+
+        statThisYear = all.Where(e => FinanceService.PersianYearOf(e.At) == persianYear).Sum(e => e.Amount);
+        statThisMonth = all
+            .Where(e => FinanceService.PersianYearOf(e.At) == persianYear && calendar.GetMonth(e.At) == currentMonth)
+            .Sum(e => e.Amount);
+
+        var query = all.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(e => e.Title.Contains(term)
+                                     || (e.Notes != null && e.Notes.Contains(term))
+                                     || (e.Party != null && e.Party.Name.Contains(term))
+                                     || (e.Product != null && e.Product.Name.Contains(term)));
+        }
+
+        if (filterCategory > 0)
+        {
+            var category = (ExpenseCategory)filterCategory;
+            query = query.Where(e => e.Category == category);
+        }
+
+        if (filterProductId > 0)
+        {
+            query = query.Where(e => e.ProductId == filterProductId);
+        }
+
+        if (fromDate.HasValue)
+        {
+            query = query.Where(e => e.At.Date >= fromDate.Value.Date);
+        }
+
+        if (toDate.HasValue)
+        {
+            query = query.Where(e => e.At.Date <= toDate.Value.Date);
+        }
+
+        items = query
+            .OrderByDescending(e => e.At)
+            .ThenByDescending(e => e.Id)
+            .Take(500)
+            .ToList();
+
+        byCategory = items
+            .GroupBy(e => e.Category)
+            .Select(g =>
+            {
+                var sample = new Expense { Category = g.Key };
+                return new FinanceCategoryStat(g.Key, sample.CategoryTitle, sample.CategoryIcon, sample.CategoryBadge, g.Sum(x => x.Amount), g.Count());
+            })
+            .OrderByDescending(x => x.Amount)
+            .ToList();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(formTitle))
+        {
+            Toasts.ShowError("شرح هزینه را وارد کنید");
+            return;
+        }
+
+        var amount = ParseNum(formAmount);
+        if (amount <= 0)
+        {
+            Toasts.ShowError("مبلغ هزینه باید بزرگ‌تر از صفر باشد");
+            return;
+        }
+
+        var quantity = ParseNum(formQuantity);
+
+        try
+        {
+            busy = true;
+
+            if (editing is null)
+            {
+                var item = new Expense
+                {
+                    Category = formCategory,
+                    Method = formMethod,
+                    Title = formTitle.Trim(),
+                    Amount = amount,
+                    At = formAt.Date,
+                    PartyId = formPartyId > 0 ? formPartyId : null,
+                    ProductId = formProductId > 0 ? formProductId : null,
+                    Quantity = quantity > 0 ? quantity : null,
+                    Notes = NullIfEmpty(formNotes),
+                    Username = currentUsername
+                };
+
+                Db.Expenses.Add(item);
+                await Db.SaveChangesAsync();
+                await AuditAsync("افزودن", "هزینه", item.Id,
+                    $"هزینهٔ «{item.Title}» در دستهٔ {item.CategoryTitle} به مبلغ {Money(item.Amount)} ثبت شد");
+                Toasts.ShowSuccess("هزینه ثبت شد");
+            }
+            else
+            {
+                editing.Category = formCategory;
+                editing.Method = formMethod;
+                editing.Title = formTitle.Trim();
+                editing.Amount = amount;
+                editing.At = formAt.Date;
+                editing.PartyId = formPartyId > 0 ? formPartyId : null;
+                editing.ProductId = formProductId > 0 ? formProductId : null;
+                editing.Quantity = quantity > 0 ? quantity : null;
+                editing.Notes = NullIfEmpty(formNotes);
+
+                await Db.SaveChangesAsync();
+                await AuditAsync("ویرایش", "هزینه", editing.Id, $"هزینهٔ «{editing.Title}» ویرایش شد");
+                Toasts.ShowSuccess("تغییرات ذخیره شد");
+            }
+
+            CancelEdit();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void StartEdit(Expense item)
+    {
+        editing = item;
+        formCategory = item.Category;
+        formMethod = item.Method;
+        formTitle = item.Title;
+        formAmount = item.Amount.ToString(CultureInfo.InvariantCulture);
+        formAt = item.At;
+        formPartyId = item.PartyId ?? 0;
+        formProductId = item.ProductId ?? 0;
+        formQuantity = item.Quantity?.ToString(CultureInfo.InvariantCulture);
+        formNotes = item.Notes;
+    }
+
+    private void CancelEdit()
+    {
+        editing = null;
+        formCategory = ExpenseCategory.ProductPurchase;
+        formMethod = PaymentMethod.Cash;
+        formTitle = string.Empty;
+        formAmount = "0";
+        formAt = DateTime.Today;
+        formPartyId = 0;
+        formProductId = 0;
+        formQuantity = null;
+        formNotes = null;
+    }
+
+    private void ClearFilters()
+    {
+        search = string.Empty;
+        filterCategory = 0;
+        filterProductId = 0;
+        fromDate = null;
+        toDate = null;
+        _ = LoadAsync();
+    }
+
+    private void SetThisMonth()
+    {
+        var calendar = new PersianCalendar();
+        var today = DateTime.Today;
+        var year = calendar.GetYear(today);
+        var month = calendar.GetMonth(today);
+
+        fromDate = calendar.ToDateTime(year, month, 1, 0, 0, 0, 0);
+        toDate = today;
+        _ = LoadAsync();
+    }
+
+    private async Task DeleteAsync(Expense item)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"هزینهٔ «{item.Title}» به مبلغ {item.Amount:N0} حذف شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            Db.Expenses.Remove(item);
+            await Db.SaveChangesAsync();
+            await AuditAsync("حذف", "هزینه", item.Id, $"هزینهٔ «{item.Title}» به مبلغ {Money(item.Amount)} حذف شد");
+            Toasts.ShowSuccess("هزینه حذف شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = items.ToList();
+            if (data.Count == 0)
+            {
+                Toasts.ShowError("داده‌ای برای خروجی وجود ندارد");
+                return;
+            }
+
+            var columns = new Dictionary<string, Func<Expense, object?>>
+            {
+                ["تاریخ"] = e => e.At,
+                ["دسته"] = e => e.CategoryTitle,
+                ["شرح"] = e => e.Title,
+                ["طرف حساب"] = e => e.Party?.Name,
+                ["کالا"] = e => e.Product?.Name,
+                ["تعداد"] = e => e.Quantity,
+                ["روش پرداخت"] = e => e.MethodTitle,
+                ["مبلغ"] = e => e.Amount.ToString("N0", CultureInfo.InvariantCulture),
+                ["بهای واحد"] = e => e.UnitCost?.ToString("N0", CultureInfo.InvariantCulture),
+                ["توضیح"] = e => e.Notes,
+                ["ثبت‌کننده"] = e => e.Username
+            };
+
+            var now = DateTime.Now;
+            var title = $"هزینه‌ها  |  تاریخ: {PersianDate.ToDate(now)}  |  تعداد: {data.Count}  |  جمع: {Money(data.Sum(e => e.Amount))}";
+
+            var bytes = Excel.Export(data, "هزینه‌ها", columns, title);
+            var fileName = $"Expenses_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {data.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static decimal ParseNum(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return 0m;
+        }
+
+        var clean = text.Trim().Replace("٫", ".").Replace("٬", "").Replace(",", "");
+
+        return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 0m;
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = currentUsername
+        });
+
+        await Db.SaveChangesAsync();
+    }
+}

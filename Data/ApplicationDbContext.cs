@@ -24,6 +24,11 @@ namespace WarehouseApp.Data
         public DbSet<SalesOrder> SalesOrders { get; set; }           // سفارش‌های فروش
         public DbSet<SalesOrderItem> SalesOrderItems { get; set; }   // اقلام سفارش
 
+        // ===== بخش مالی =====
+        public DbSet<Cheque> Cheques { get; set; }     // چک و سفته
+        public DbSet<Debt> Debts { get; set; }         // بدهی و طلب
+        public DbSet<Expense> Expenses { get; set; }   // هزینه‌ها
+
         // 👇 متد جدید برای تنظیم رفتار حذف دسته
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -107,6 +112,41 @@ namespace WarehouseApp.Data
                 .WithMany()
                 .HasForeignKey(i => i.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // ===== مالی =====
+
+            // سند مالی و بدهی با حذف طرف حساب پاک نمی‌شوند؛ فقط ارتباطشان خالی می‌شود
+            modelBuilder.Entity<Cheque>()
+                .HasOne(c => c.Party)
+                .WithMany()
+                .HasForeignKey(c => c.PartyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Debt>()
+                .HasOne(d => d.Party)
+                .WithMany()
+                .HasForeignKey(d => d.PartyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Expense>()
+                .HasOne(e => e.Party)
+                .WithMany()
+                .HasForeignKey(e => e.PartyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // کالای مرتبط با هزینه، پاک نمی‌شود
+            modelBuilder.Entity<Expense>()
+                .HasOne(e => e.Product)
+                .WithMany()
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // جستجو بر اساس تاریخ سررسید اسناد و تاریخ هزینه
+            modelBuilder.Entity<Cheque>()
+                .HasIndex(c => c.DueDate);
+
+            modelBuilder.Entity<Expense>()
+                .HasIndex(e => e.At);
 
             // ===== نقش‌های پیش‌فرض =====
             modelBuilder.Entity<Role>().HasData(
