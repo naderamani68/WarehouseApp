@@ -1,0 +1,594 @@
+﻿@page "/crm/interactions"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>پیگیری‌ها | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">📞 پیگیری‌ها و تعامل‌ها</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "ثبت پیگیری جدید" : $"ویرایش پیگیری: {editing.Subject}")</h5>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">طرف حساب</label>
+                <select class="form-select" @bind="formPartyId">
+                    <option value="0">— انتخاب کنید —</option>
+                    @foreach (var p in parties)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نوع تعامل</label>
+                <select class="form-select" @bind="formKind">
+                    <option value="@InteractionKind.Call">تماس تلفنی</option>
+                    <option value="@InteractionKind.Meeting">جلسه</option>
+                    <option value="@InteractionKind.Email">ایمیل</option>
+                    <option value="@InteractionKind.Sms">پیامک</option>
+                    <option value="@InteractionKind.Visit">بازدید</option>
+                    <option value="@InteractionKind.Note">یادداشت</option>
+                    <option value="@InteractionKind.Complaint">شکایت</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">موضوع</label>
+                <input class="form-control" @bind="formSubject" placeholder="مثلاً: پیگیری پیش‌فاکتور" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">وضعیت</label>
+                <select class="form-select" @bind="formStatus">
+                    <option value="@InteractionStatus.Open">در انتظار</option>
+                    <option value="@InteractionStatus.Done">انجام شد</option>
+                    <option value="@InteractionStatus.Canceled">لغو شد</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">زمان تعامل</label>
+                <input type="date" class="form-control" @bind="formAt" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">سررسید پیگیری بعدی (اختیاری)</label>
+                <input type="date" class="form-control" @bind="formFollowUp" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">شرح گفتگو یا نتیجه</label>
+                <textarea class="form-control" rows="2" @bind="formNotes"></textarea>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
+                    @(editing is null ? "ثبت پیگیری" : "ذخیره تغییرات")
+                </button>
+                @if (editing is not null)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@busy">انصراف</button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">جستجو</label>
+                <input class="form-control" @bind="search" @bind:after="LoadAsync" placeholder="موضوع یا شرح..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">طرف حساب</label>
+                <select class="form-select" @bind="filterPartyId" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    @foreach (var p in parties)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نوع</label>
+                <select class="form-select" @bind="filterKind" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    <option value="@InteractionKind.Call">تماس تلفنی</option>
+                    <option value="@InteractionKind.Meeting">جلسه</option>
+                    <option value="@InteractionKind.Email">ایمیل</option>
+                    <option value="@InteractionKind.Sms">پیامک</option>
+                    <option value="@InteractionKind.Visit">بازدید</option>
+                    <option value="@InteractionKind.Note">یادداشت</option>
+                    <option value="@InteractionKind.Complaint">شکایت</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">وضعیت</label>
+                <select class="form-select" @bind="filterStatus" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    <option value="@InteractionStatus.Open">در انتظار</option>
+                    <option value="@InteractionStatus.Done">انجام شد</option>
+                    <option value="@InteractionStatus.Canceled">لغو شد</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">سررسید</label>
+                <select class="form-select" @bind="filterDue" @bind:after="LoadAsync">
+                    <option value="all">— همه —</option>
+                    <option value="overdue">گذشته</option>
+                    <option value="today">امروز</option>
+                    <option value="week">تا یک هفته</option>
+                    <option value="none">بدون سررسید</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted small">@items.Count.ToString("N0", Fa) پیگیری پیدا شد</div>
+            <div class="d-flex gap-2 align-items-center">
+                <label class="form-label mb-0 small">تعداد در صفحه:</label>
+                <select class="form-select form-select-sm" style="width:auto" @bind="pageSize" @bind:after="LoadAsync">
+                    <option value="10">۱۰</option>
+                    <option value="20">۲۰</option>
+                    <option value="50">۵۰</option>
+                </select>
+                <button class="btn btn-sm btn-success" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>در حال ساخت...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-excel"></i>
+                        <span>خروجی Excel</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>طرف حساب</th>
+                        <th>نوع</th>
+                        <th>موضوع</th>
+                        <th>زمان</th>
+                        <th>سررسید</th>
+                        <th>وضعیت</th>
+                        <th>ثبت‌کننده</th>
+                        <th style="width:190px">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">پیگیری‌ای برای نمایش نیست.</td>
+                        </tr>
+                    }
+                    @foreach (var item in items)
+                    {
+                        <tr class="@(item.IsOverdue ? "table-danger" : item.IsDueToday ? "table-warning" : "")">
+                            <td>
+                                <a href="@($"crm/parties/{item.PartyId}")">@(item.Party?.Name ?? "—")</a>
+                            </td>
+                            <td class="small"><i class="bi @item.KindIcon me-1"></i>@item.KindTitle</td>
+                            <td>
+                                <div>@item.Subject</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <div class="text-muted small">@item.Notes</div>
+                                }
+                            </td>
+                            <td class="small" dir="ltr">@PersianDate.ToDateTime(item.At)</td>
+                            <td class="small" dir="ltr">
+                                @if (item.FollowUpAt.HasValue)
+                                {
+                                    <span>@PersianDate.ToDate(item.FollowUpAt.Value)</span>
+                                    @if (item.IsOverdue)
+                                    {
+                                        <span class="badge bg-danger ms-1">گذشته</span>
+                                    }
+                                    else if (item.IsDueToday)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1">امروز</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @StatusBadge(item.Status)">@item.StatusTitle</span>
+                            </td>
+                            <td class="small text-muted">@(item.Username ?? "—")</td>
+                            <td>
+                                @if (CanManage)
+                                {
+                                    @if (item.Status == InteractionStatus.Open)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success me-1" @onclick="() => MarkDoneAsync(item)">انجام شد</button>
+                                    }
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(item)">ویرایش</button>
+                                }
+                                @if (CanDelete)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (totalPages > 1)
+    {
+        <nav class="mt-3">
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(page <= 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => GoTo(page - 1)">قبلی</button>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">صفحهٔ @(page.ToString("N0", Fa)) از @(totalPages.ToString("N0", Fa))</span>
+                </li>
+                <li class="page-item @(page >= totalPages ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => GoTo(page + 1)">بعدی</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool CanDelete;
+    private bool CanExport;
+
+    private List<Party> parties = new();
+    private List<CrmInteraction> items = new();
+    private CrmInteraction? editing;
+
+    private int page = 1;
+    private int pageSize = 20;
+    private int totalPages = 1;
+
+    private string search = string.Empty;
+    private int filterPartyId;
+    private int filterKind;
+    private int filterStatus;
+    private string filterDue = "all";
+
+    private int formPartyId;
+    private InteractionKind formKind = InteractionKind.Call;
+    private string formSubject = string.Empty;
+    private string? formNotes;
+    private DateTime formAt = DateTime.Today;
+    private DateTime? formFollowUp;
+    private InteractionStatus formStatus = InteractionStatus.Open;
+
+    private bool busy;
+    private bool isExporting;
+    private string? currentUsername;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewCrm);
+        CanManage = await Access.HasAsync(user, Permissions.ManageCrm);
+        CanDelete = await Access.HasAsync(user, Permissions.DeleteCrm);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        parties = await Db.Parties.Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = Db.CrmInteractions.Include(i => i.Party).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(i => i.Subject.Contains(term) || (i.Notes != null && i.Notes.Contains(term)));
+        }
+
+        if (filterPartyId > 0)
+        {
+            query = query.Where(i => i.PartyId == filterPartyId);
+        }
+
+        if (filterKind > 0)
+        {
+            var kind = (InteractionKind)filterKind;
+            query = query.Where(i => i.Kind == kind);
+        }
+
+        if (filterStatus > 0)
+        {
+            var status = (InteractionStatus)filterStatus;
+            query = query.Where(i => i.Status == status);
+        }
+
+        var today = DateTime.Today;
+
+        query = filterDue switch
+        {
+            "overdue" => query.Where(i => i.Status == InteractionStatus.Open && i.FollowUpAt != null && i.FollowUpAt.Value.Date < today),
+            "today" => query.Where(i => i.Status == InteractionStatus.Open && i.FollowUpAt != null && i.FollowUpAt.Value.Date == today),
+            "week" => query.Where(i => i.Status == InteractionStatus.Open && i.FollowUpAt != null && i.FollowUpAt.Value.Date >= today && i.FollowUpAt.Value.Date <= today.AddDays(7)),
+            "none" => query.Where(i => i.FollowUpAt == null),
+            _ => query
+        };
+
+        var total = await query.CountAsync();
+        totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+        if (page > totalPages)
+        {
+            page = totalPages;
+        }
+
+        items = await query
+            .OrderBy(i => i.Status == InteractionStatus.Open ? 0 : 1)
+            .ThenBy(i => i.FollowUpAt ?? DateTime.MaxValue)
+            .ThenByDescending(i => i.At)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+
+    private void GoTo(int target)
+    {
+        if (target < 1 || target > totalPages)
+        {
+            return;
+        }
+
+        page = target;
+        _ = LoadAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (formPartyId <= 0)
+        {
+            Toasts.ShowError("طرف حساب را انتخاب کنید");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formSubject))
+        {
+            Toasts.ShowError("موضوع را وارد کنید");
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            if (editing is null)
+            {
+                var item = new CrmInteraction
+                {
+                    PartyId = formPartyId,
+                    Kind = formKind,
+                    Subject = formSubject.Trim(),
+                    Notes = NullIfEmpty(formNotes),
+                    At = formAt.Date,
+                    FollowUpAt = formFollowUp?.Date,
+                    Status = formStatus,
+                    Username = currentUsername
+                };
+
+                if (item.Status == InteractionStatus.Done)
+                {
+                    item.DoneAt = DateTime.Now;
+                }
+
+                Db.CrmInteractions.Add(item);
+                await Db.SaveChangesAsync();
+                await AuditAsync("افزودن", "پیگیری", item.Id, $"پیگیری «{item.Subject}» ثبت شد");
+                Toasts.ShowSuccess("پیگیری ثبت شد");
+            }
+            else
+            {
+                editing.PartyId = formPartyId;
+                editing.Kind = formKind;
+                editing.Subject = formSubject.Trim();
+                editing.Notes = NullIfEmpty(formNotes);
+                editing.At = formAt.Date;
+                editing.FollowUpAt = formFollowUp?.Date;
+
+                if (editing.Status != formStatus)
+                {
+                    editing.Status = formStatus;
+                    editing.DoneAt = formStatus == InteractionStatus.Done ? DateTime.Now : null;
+                }
+
+                await Db.SaveChangesAsync();
+                await AuditAsync("ویرایش", "پیگیری", editing.Id, $"پیگیری «{editing.Subject}» ویرایش شد");
+                Toasts.ShowSuccess("تغییرات ذخیره شد");
+            }
+
+            CancelEdit();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void StartEdit(CrmInteraction item)
+    {
+        editing = item;
+        formPartyId = item.PartyId;
+        formKind = item.Kind;
+        formSubject = item.Subject;
+        formNotes = item.Notes;
+        formAt = item.At;
+        formFollowUp = item.FollowUpAt;
+        formStatus = item.Status;
+    }
+
+    private void CancelEdit()
+    {
+        editing = null;
+        formPartyId = 0;
+        formKind = InteractionKind.Call;
+        formSubject = string.Empty;
+        formNotes = null;
+        formAt = DateTime.Today;
+        formFollowUp = null;
+        formStatus = InteractionStatus.Open;
+    }
+
+    private async Task MarkDoneAsync(CrmInteraction item)
+    {
+        try
+        {
+            item.Status = InteractionStatus.Done;
+            item.DoneAt = DateTime.Now;
+            await Db.SaveChangesAsync();
+            await AuditAsync("ویرایش", "پیگیری", item.Id, $"پیگیری «{item.Subject}» انجام‌شده علامت خورد");
+            Toasts.ShowSuccess("پیگیری انجام‌شده ثبت شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteAsync(CrmInteraction item)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"پیگیری «{item.Subject}» حذف شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            Db.CrmInteractions.Remove(item);
+            await Db.SaveChangesAsync();
+            await AuditAsync("حذف", "پیگیری", item.Id, $"پیگیری «{item.Subject}» حذف شد");
+            Toasts.ShowSuccess("پیگیری حذف شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = items.ToList();
+            if (data.Count == 0)
+            {
+                Toasts.ShowError("داده‌ای برای خروجی وجود ندارد");
+                return;
+            }
+
+            var columns = new Dictionary<string, Func<CrmInteraction, object?>>
+            {
+                ["طرف حساب"] = i => i.Party?.Name,
+                ["نوع"] = i => i.KindTitle,
+                ["موضوع"] = i => i.Subject,
+                ["شرح"] = i => i.Notes,
+                ["زمان تعامل"] = i => i.At,
+                ["سررسید"] = i => i.FollowUpAt,
+                ["وضعیت"] = i => i.StatusTitle,
+                ["ثبت‌کننده"] = i => i.Username
+            };
+
+            var now = DateTime.Now;
+            var title = $"پیگیری‌ها  |  تاریخ: {PersianDate.ToDate(now)}  |  تعداد: {data.Count}";
+
+            var bytes = Excel.Export(data, "پیگیری‌ها", columns, title);
+            var fileName = $"CrmInteractions_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {data.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static string StatusBadge(InteractionStatus status) => status switch
+    {
+        InteractionStatus.Open => "bg-warning text-dark",
+        InteractionStatus.Done => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = currentUsername
+        });
+
+        await Db.SaveChangesAsync();
+    }
+}

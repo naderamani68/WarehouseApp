@@ -1,4 +1,4 @@
-@page "/crm/parties"
+﻿@page "/crm/parties"
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using System.Globalization
@@ -220,9 +220,10 @@ else
                             }
                         </td>
                         <td>
+                            <a class="btn btn-sm btn-outline-primary me-1" href="@($"crm/parties/{item.Id}")">پرونده</a>
                             @if (CanManage)
                             {
-                                <button type="button" class="btn btn-sm btn-warning" @onclick="() => StartEdit(item)">ویرایش</button>
+                                <button type="button" class="btn btn-sm btn-warning me-1" @onclick="() => StartEdit(item)">ویرایش</button>
                             }
                             @if (CanDelete)
                             {

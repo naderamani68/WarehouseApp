@@ -58,8 +58,22 @@ public enum Permissions
     /// <summary>حذف مشتریان و تأمین‌کنندگان</summary>
     DeleteParties = 1 << 15,
 
+    /// <summary>دیدن پیگیری‌ها، فرصت‌های فروش و سفارش‌های فروش</summary>
+    ViewCrm = 1 << 16,
+
+    /// <summary>افزودن و ویرایش پیگیری، فرصت فروش و سفارش فروش</summary>
+    ManageCrm = 1 << 17,
+
+    /// <summary>حذف پیگیری، فرصت فروش و سفارش فروش</summary>
+    DeleteCrm = 1 << 18,
+
+    /// <summary>تأیید سفارش فروش (کسر واقعی از انبار)</summary>
+    ConfirmSalesOrders = 1 << 19,
+
     /// <summary>همهٔ اختیارات</summary>
     All = ViewData | ManageProducts | DeleteProducts | ManageCategories | DeleteCategories
         | ManageWarehouses | DeleteWarehouses | RegisterMovements | ExportExcel
         | ViewReports | ManageEmployees | ManageRoles | ViewAuditLog
+        | ViewParties | ManageParties | DeleteParties
+        | ViewCrm | ManageCrm | DeleteCrm | ConfirmSalesOrders
 }

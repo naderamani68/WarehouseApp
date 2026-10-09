@@ -1,0 +1,387 @@
+﻿@page "/crm"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>داشبورد فروش | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">📈 داشبورد فروش و پیگیری</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else if (stats is null)
+{
+    <div class="text-muted">در حال بارگذاری…</div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">طرف حساب فعال</div>
+                <div class="fs-4 fw-bold">@stats.ActiveParties.ToString("N0", Fa)</div>
+                <div class="text-muted small">مشتری: @stats.CustomerCount | تأمین‌کننده: @stats.SupplierCount</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">پیگیری باز</div>
+                <div class="fs-4 fw-bold">@stats.OpenInteractions.ToString("N0", Fa)</div>
+                <div class="small">
+                    <span class="@(stats.OverdueInteractions > 0 ? "text-danger fw-bold" : "text-muted")">
+                        سررسید گذشته: @stats.OverdueInteractions
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">سررسید امروز</div>
+                <div class="fs-4 fw-bold @(stats.DueTodayInteractions > 0 ? "text-warning" : "")">
+                    @stats.DueTodayInteractions.ToString("N0", Fa)
+                </div>
+                <div class="text-muted small">پیگیری برای امروز</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">فرصت فروش باز</div>
+                <div class="fs-4 fw-bold">@stats.OpenOpportunities.ToString("N0", Fa)</div>
+                <div class="text-muted small">برنده‌شده: @stats.WonOpportunities</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">ارزش قیف فروش</div>
+                <div class="fs-4 fw-bold">@Money(stats.PipelineValue)</div>
+                <div class="text-muted small">وزن‌دار: @Money(stats.WeightedPipeline)</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-2">
+            <div class="card p-3 h-100">
+                <div class="text-muted small">فروش تأییدشده</div>
+                <div class="fs-4 fw-bold text-success">@Money(stats.ConfirmedSalesValue)</div>
+                <div class="text-muted small">سفارش تأییدشده: @stats.ConfirmedOrders | پیش‌نویس: @stats.DraftOrders</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">قیف فروش</h5>
+        <button class="btn btn-sm btn-success" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+            @if (isExporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>در حال ساخت...</span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel"></i>
+                <span>خروجی Excel</span>
+            }
+        </button>
+    </div>
+
+    <div class="card p-3 mb-4">
+        @if (maxStageAmount <= 0)
+        {
+            <div class="text-muted">هنوز فرصت فروشی ثبت نشده است.</div>
+        }
+        else
+        {
+            @foreach (var stage in stats.Stages)
+            {
+                var percent = maxStageAmount <= 0 ? 0 : (int)Math.Round(stage.Amount / maxStageAmount * 100);
+                <div class="chart-row mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>@stage.Title <span class="text-muted">(@stage.Count.ToString("N0", Fa) مورد)</span></span>
+                        <span class="fw-bold">@Money(stage.Amount)</span>
+                    </div>
+                    <div class="chart-bar-wrapper" style="background:rgba(128,128,128,.15);border-radius:8px;height:14px;overflow:hidden;">
+                        <div class="@StageBarClass(stage.Stage)"
+                             style="width:@(percent)%;height:100%;transition:width .8s cubic-bezier(.4,0,.2,1);"></div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">⏰ پیگیری‌های سررسیدشده و نزدیک</h6>
+                @if (stats.DueList.Count == 0)
+                {
+                    <div class="text-muted small">پیگیری زمان‌داری وجود ندارد.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>طرف حساب</th>
+                                <th>موضوع</th>
+                                <th>سررسید</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in stats.DueList)
+                            {
+                                <tr class="@(item.IsOverdue ? "table-danger" : item.IsDueToday ? "table-warning" : "")">
+                                    <td>@(item.Party?.Name ?? "—")</td>
+                                    <td class="small">@item.Subject</td>
+                                    <td class="small" dir="ltr">@PersianDate.ToDate(item.FollowUpAt!.Value)</td>
+                                    <td>
+                                        <a class="btn btn-sm btn-outline-primary" href="@($"crm/parties/{item.PartyId}")">پرونده</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                <div class="mt-2">
+                    <a class="btn btn-sm btn-outline-secondary" href="crm/interactions">همهٔ پیگیری‌ها</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">🕒 آخرین تعامل‌ها</h6>
+                @if (stats.RecentList.Count == 0)
+                {
+                    <div class="text-muted small">هنوز تعاملی ثبت نشده است.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>طرف حساب</th>
+                                <th>نوع</th>
+                                <th>موضوع</th>
+                                <th>زمان</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in stats.RecentList)
+                            {
+                                <tr>
+                                    <td>@(item.Party?.Name ?? "—")</td>
+                                    <td class="small"><i class="bi @item.KindIcon me-1"></i>@item.KindTitle</td>
+                                    <td class="small">@item.Subject</td>
+                                    <td class="small text-muted" dir="ltr">@PersianDate.ToDateTime(item.At)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">💼 فرصت‌های باز (به ترتیب مبلغ)</h6>
+                @if (stats.OpenOpportunityList.Count == 0)
+                {
+                    <div class="text-muted small">فرصت بازی وجود ندارد.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>عنوان</th>
+                                <th>طرف حساب</th>
+                                <th>مرحله</th>
+                                <th>مبلغ</th>
+                                <th>بستن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in stats.OpenOpportunityList)
+                            {
+                                <tr class="@(item.IsLate ? "table-warning" : "")">
+                                    <td class="small">@item.Title</td>
+                                    <td class="small">@(item.Party?.Name ?? "—")</td>
+                                    <td><span class="badge @item.StageBadge">@item.StageTitle</span></td>
+                                    <td class="small">@Money(item.Amount)</td>
+                                    <td class="small text-muted" dir="ltr">@PersianDate.OrDash(item.ExpectedCloseAt)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                <div class="mt-2">
+                    <a class="btn btn-sm btn-outline-secondary" href="crm/opportunities">همهٔ فرصت‌ها</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card p-3 h-100">
+                <h6 class="mb-3">🏆 بهترین مشتریان (بر پایهٔ فروش تأییدشده)</h6>
+                @if (stats.TopParties.Count == 0)
+                {
+                    <div class="text-muted small">هنوز سفارش تأییدشده‌ای ثبت نشده است.</div>
+                }
+                else
+                {
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>طرف حساب</th>
+                                <th>تعداد سفارش</th>
+                                <th>مبلغ کل</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ var rank = 1; }
+                            @foreach (var item in stats.TopParties)
+                            {
+                                <tr>
+                                    <td>@rank.ToString("N0", Fa)</td>
+                                    <td>@item.Name</td>
+                                    <td>@item.Orders.ToString("N0", Fa)</td>
+                                    <td class="fw-bold">@Money(item.Total)</td>
+                                </tr>
+                                rank++;
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanExport;
+    private bool isExporting;
+    private CrmStats? stats;
+
+    private decimal maxStageAmount => stats is null || stats.Stages.Count == 0
+        ? 0m
+        : stats.Stages.Max(s => s.Amount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        var canCrm = await Access.HasAsync(user, Permissions.ViewCrm);
+        var canParties = await Access.HasAsync(user, Permissions.ViewParties);
+        allowed = canCrm || canParties;
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        stats = await CrmService.GetStatsAsync(Db);
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private static string StageBarClass(OpportunityStage stage) => stage switch
+    {
+        OpportunityStage.New => "bg-secondary",
+        OpportunityStage.Contacted => "bg-info",
+        OpportunityStage.Qualified => "bg-primary",
+        OpportunityStage.Proposal => "bg-warning",
+        OpportunityStage.Negotiation => "bg-dark",
+        OpportunityStage.Won => "bg-success",
+        _ => "bg-danger"
+    };
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        if (stats is null)
+        {
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var rows = new List<DashboardRow>
+            {
+                new("طرف حساب فعال", stats.ActiveParties.ToString("N0", Fa)),
+                new("مشتری", stats.CustomerCount.ToString("N0", Fa)),
+                new("تأمین‌کننده", stats.SupplierCount.ToString("N0", Fa)),
+                new("پیگیری باز", stats.OpenInteractions.ToString("N0", Fa)),
+                new("پیگیری سررسید گذشته", stats.OverdueInteractions.ToString("N0", Fa)),
+                new("پیگیری سررسید امروز", stats.DueTodayInteractions.ToString("N0", Fa)),
+                new("فرصت فروش باز", stats.OpenOpportunities.ToString("N0", Fa)),
+                new("ارزش قیف فروش", Money(stats.PipelineValue)),
+                new("ارزش وزن‌دار قیف", Money(stats.WeightedPipeline)),
+                new("فرصت برنده‌شده", stats.WonOpportunities.ToString("N0", Fa)),
+                new("ارزش فرصت‌های برنده", Money(stats.WonValue)),
+                new("سفارش پیش‌نویس", stats.DraftOrders.ToString("N0", Fa)),
+                new("سفارش تأییدشده", stats.ConfirmedOrders.ToString("N0", Fa)),
+                new("ارزش فروش تأییدشده", Money(stats.ConfirmedSalesValue))
+            };
+
+            foreach (var stage in stats.Stages)
+            {
+                rows.Add(new DashboardRow($"قیف — {stage.Title}", $"{stage.Count.ToString("N0", Fa)} مورد / {Money(stage.Amount)}"));
+            }
+
+            foreach (var party in stats.TopParties)
+            {
+                rows.Add(new DashboardRow($"مشتری برتر — {party.Name}", $"{party.Orders.ToString("N0", Fa)} سفارش / {Money(party.Total)}"));
+            }
+
+            var columns = new Dictionary<string, Func<DashboardRow, object?>>
+            {
+                ["شاخص"] = r => r.Title,
+                ["مقدار"] = r => r.Value
+            };
+
+            var now = DateTime.Now;
+            var title = $"داشبورد فروش  |  تاریخ: {PersianDate.ToDate(now)}";
+
+            var bytes = Excel.Export(rows, "داشبورد فروش", columns, title);
+            var fileName = $"CrmDashboard_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {rows.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private record DashboardRow(string Title, string Value);
+}

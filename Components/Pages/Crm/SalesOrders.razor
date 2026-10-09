@@ -1,0 +1,789 @@
+﻿@page "/crm/orders"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>سفارش‌های فروش | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">🧾 سفارش‌های فروش</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">
+            @(editing is null ? "ثبت سفارش فروش جدید" : $"ویرایش سفارش {editing.OrderNumber}")
+            @if (editing is not null)
+            {
+                <span class="badge @editing.StatusBadge ms-2">@editing.StatusTitle</span>
+            }
+        </h5>
+
+        @if (editing is not null && editing.Status != OrderStatus.Draft)
+        {
+            <div class="alert alert-warning">فقط سفارش پیش‌نویس قابل ویرایش است. برای تغییر، ابتدا یک سفارش پیش‌نویس بسازید.</div>
+        }
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">طرف حساب (مشتری)</label>
+                <select class="form-select" @bind="formPartyId" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)">
+                    <option value="0">— انتخاب کنید —</option>
+                    @foreach (var p in customers)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">انبار خروج</label>
+                <select class="form-select" @bind="formWarehouseId" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)">
+                    <option value="0">— انتخاب کنید —</option>
+                    @foreach (var w in warehouses)
+                    {
+                        <option value="@w.Id">@w.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">تاریخ سفارش</label>
+                <input type="date" class="form-control" @bind="formDate" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">شمارهٔ سفارش</label>
+                <input class="form-control" dir="ltr" value="@(editing?.OrderNumber ?? nextNumber)" readonly />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">یادداشت</label>
+                <input class="form-control" @bind="formNotes" disabled="@(editing is not null && editing.Status != OrderStatus.Draft)" />
+            </div>
+        </div>
+
+        <h6 class="mt-4 mb-2">اقلام سفارش</h6>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th style="min-width:260px">کالا</th>
+                        <th style="width:110px">تعداد</th>
+                        <th style="width:150px">قیمت واحد</th>
+                        <th style="width:110px">تخفیف ٪</th>
+                        <th style="width:150px">جمع</th>
+                        <th style="width:60px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in lines)
+                    {
+                        <tr>
+                            <td>
+                                <select class="form-select form-select-sm" @bind="line.ProductId">
+                                    <option value="0">— انتخاب کالا —</option>
+                                    @foreach (var p in products)
+                                    {
+                                        <option value="@p.Id">@p.Name (موجودی: @p.Quantity.ToString("N0", Fa))</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><input class="form-control form-control-sm" dir="ltr" @bind="line.Quantity" /></td>
+                            <td><input class="form-control form-control-sm" dir="ltr" @bind="line.UnitPrice" /></td>
+                            <td><input class="form-control form-control-sm" dir="ltr" @bind="line.Discount" /></td>
+                            <td class="fw-bold">@Money(line.Total)</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveLine(line)" title="حذف قلم">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="text-end fw-bold">جمع کل:</td>
+                        <td class="fw-bold text-success">@Money(lines.Sum(l => l.Total))</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="AddLine">
+                <i class="bi bi-plus-lg"></i> افزودن قلم
+            </button>
+
+            @if (CanManage && (editing is null || editing.Status == OrderStatus.Draft))
+            {
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
+                    @(editing is null ? "ثبت سفارش (پیش‌نویس)" : "ذخیره تغییرات")
+                </button>
+            }
+
+            @if (editing is not null && editing.Status == OrderStatus.Draft && CanConfirm)
+            {
+                <button class="btn btn-success" @onclick="() => ConfirmOrderAsync(editing!)" disabled="@busy">
+                    <i class="bi bi-check2-circle"></i> تأیید و کسر از انبار
+                </button>
+            }
+
+            @if (editing is not null)
+            {
+                <button class="btn btn-outline-secondary" @onclick="ResetForm" disabled="@busy">فرم جدید</button>
+            }
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">جستجو</label>
+                <input class="form-control" @bind="search" @bind:after="LoadAsync" placeholder="شمارهٔ سفارش، نام مشتری یا یادداشت..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">وضعیت</label>
+                <select class="form-select" @bind="filterStatus" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    <option value="@OrderStatus.Draft">پیش‌نویس</option>
+                    <option value="@OrderStatus.Confirmed">تأییدشده</option>
+                    <option value="@OrderStatus.Canceled">لغو‌شده</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">طرف حساب</label>
+                <select class="form-select" @bind="filterPartyId" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    @foreach (var p in customers)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 text-end">
+                <button class="btn btn-success w-100" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-excel"></i>
+                        <span>Excel</span>
+                    }
+                </button>
+            </div>
+        </div>
+        <div class="text-muted small mt-2">
+            @orders.Count.ToString("N0", Fa) سفارش — جمع مبلغ سفارش‌های نمایش‌داده‌شده: @Money(orders.Sum(o => o.Total))
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:40px"></th>
+                        <th>شماره</th>
+                        <th>مشتری</th>
+                        <th>انبار</th>
+                        <th>تاریخ</th>
+                        <th>اقلام</th>
+                        <th>مبلغ کل</th>
+                        <th>وضعیت</th>
+                        <th>ثبت‌کننده</th>
+                        <th style="width:250px">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (orders.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4">سفارشی برای نمایش نیست.</td>
+                        </tr>
+                    }
+                    @foreach (var order in orders)
+                    {
+                        <tr>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Toggle(order.Id)">
+                                    <i class="bi @(expanded.Contains(order.Id) ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </button>
+                            </td>
+                            <td class="fw-bold" dir="ltr">@order.OrderNumber</td>
+                            <td><a href="@($"crm/parties/{order.PartyId}")">@(order.Party?.Name ?? "—")</a></td>
+                            <td class="small">@(order.Warehouse?.Name ?? "—")</td>
+                            <td class="small" dir="ltr">@PersianDate.ToDate(order.OrderDate)</td>
+                            <td class="small">@order.Items.Count.ToString("N0", Fa) قلم / @order.TotalQuantity.ToString("N0", Fa) عدد</td>
+                            <td class="fw-bold">@Money(order.Total)</td>
+                            <td>
+                                <span class="badge @order.StatusBadge">@order.StatusTitle</span>
+                                @if (order.Status == OrderStatus.Confirmed && order.ConfirmedAt.HasValue)
+                                {
+                                    <div class="text-muted small" dir="ltr">@PersianDate.ToDate(order.ConfirmedAt.Value)</div>
+                                }
+                            </td>
+                            <td class="small text-muted">@(order.Username ?? "—")</td>
+                            <td>
+                                @if (order.Status == OrderStatus.Draft && CanManage)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(order)">ویرایش</button>
+                                }
+                                @if (order.Status == OrderStatus.Draft && CanConfirm)
+                                {
+                                    <button class="btn btn-sm btn-outline-success me-1" @onclick="() => ConfirmOrderAsync(order)">تأیید</button>
+                                }
+                                @if (order.Status == OrderStatus.Draft && CanManage)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => CancelOrderAsync(order)">لغو</button>
+                                }
+                                @if (order.Status != OrderStatus.Confirmed && CanDelete)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(order)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+
+                        @if (expanded.Contains(order.Id))
+                        {
+                            <tr>
+                                <td colspan="10" class="p-0">
+                                    <div class="p-3" style="background:rgba(128,128,128,.07)">
+                                        @if (string.IsNullOrWhiteSpace(order.Notes) == false)
+                                        {
+                                            <div class="mb-2"><strong>یادداشت:</strong> @order.Notes</div>
+                                        }
+                                        @if (order.Status == OrderStatus.Canceled && !string.IsNullOrWhiteSpace(order.CancelReason))
+                                        {
+                                            <div class="mb-2 text-danger"><strong>دلیل لغو:</strong> @order.CancelReason</div>
+                                        }
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>کالا</th>
+                                                    <th>تعداد</th>
+                                                    <th>قیمت واحد</th>
+                                                    <th>تخفیف</th>
+                                                    <th>جمع</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var item in order.Items)
+                                                {
+                                                    <tr>
+                                                        <td>@(item.Product?.Name ?? "—")</td>
+                                                        <td>@item.Quantity.ToString("N0", Fa)</td>
+                                                        <td>@Money(item.UnitPrice)</td>
+                                                        <td>@item.DiscountPercent.ToString("N0", Fa)٪</td>
+                                                        <td>@Money(item.LineTotal)</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool CanDelete;
+    private bool CanExport;
+    private bool CanConfirm;
+
+    private List<Party> customers = new();
+    private List<Warehouse> warehouses = new();
+    private List<Product> products = new();
+    private List<SalesOrder> orders = new();
+    private SalesOrder? editing;
+    private readonly HashSet<int> expanded = new();
+
+    private string search = string.Empty;
+    private int filterStatus;
+    private int filterPartyId;
+
+    private int formPartyId;
+    private int formWarehouseId;
+    private DateTime formDate = DateTime.Today;
+    private string? formNotes;
+    private string nextNumber = string.Empty;
+    private List<LineDraft> lines = new();
+
+    private bool busy;
+    private bool isExporting;
+    private string? currentUsername;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewCrm);
+        CanManage = await Access.HasAsync(user, Permissions.ManageCrm);
+        CanDelete = await Access.HasAsync(user, Permissions.DeleteCrm);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+        CanConfirm = await Access.HasAsync(user, Permissions.ConfirmSalesOrders);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        customers = await Db.Parties
+            .Where(p => p.IsActive && (p.Type == PartyType.Customer || p.Type == PartyType.Both))
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        warehouses = await Db.Warehouses.OrderBy(w => w.Name).ToListAsync();
+        products = await Db.Products.OrderBy(p => p.Name).ToListAsync();
+        nextNumber = await CrmService.NextOrderNumberAsync(Db);
+
+        AddLine();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = Db.SalesOrders
+            .Include(o => o.Party)
+            .Include(o => o.Warehouse)
+            .Include(o => o.Items).ThenInclude(i => i.Product)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(o => o.OrderNumber.Contains(term)
+                                     || (o.Notes != null && o.Notes.Contains(term))
+                                     || (o.Party != null && o.Party.Name.Contains(term)));
+        }
+
+        if (filterStatus > 0)
+        {
+            var status = (OrderStatus)filterStatus;
+            query = query.Where(o => o.Status == status);
+        }
+
+        if (filterPartyId > 0)
+        {
+            query = query.Where(o => o.PartyId == filterPartyId);
+        }
+
+        orders = await query
+            .OrderByDescending(o => o.OrderDate)
+            .ThenByDescending(o => o.Id)
+            .Take(200)
+            .ToListAsync();
+    }
+
+    private void Toggle(int id)
+    {
+        if (!expanded.Add(id))
+        {
+            expanded.Remove(id);
+        }
+    }
+
+    private void AddLine() => lines.Add(new LineDraft());
+
+    private void RemoveLine(LineDraft line)
+    {
+        lines.Remove(line);
+        if (lines.Count == 0)
+        {
+            AddLine();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (formPartyId <= 0)
+        {
+            Toasts.ShowError("طرف حساب را انتخاب کنید");
+            return;
+        }
+
+        var valid = lines
+            .Where(l => l.ProductId > 0 && l.QuantityValue > 0)
+            .ToList();
+
+        if (valid.Count == 0)
+        {
+            Toasts.ShowError("حداقل یک قلم با کالا و تعداد معتبر لازم است");
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            SalesOrder order;
+
+            if (editing is null)
+            {
+                order = new SalesOrder
+                {
+                    OrderNumber = await CrmService.NextOrderNumberAsync(Db),
+                    Username = currentUsername
+                };
+                Db.SalesOrders.Add(order);
+            }
+            else
+            {
+                order = await Db.SalesOrders
+                    .Include(o => o.Items)
+                    .FirstAsync(o => o.Id == editing.Id);
+
+                if (order.Status != OrderStatus.Draft)
+                {
+                    Toasts.ShowError("فقط سفارش پیش‌نویس قابل ویرایش است");
+                    return;
+                }
+
+                Db.SalesOrderItems.RemoveRange(order.Items);
+                order.Items.Clear();
+            }
+
+            order.PartyId = formPartyId;
+            order.WarehouseId = formWarehouseId > 0 ? formWarehouseId : null;
+            order.OrderDate = formDate.Date;
+            order.Notes = NullIfEmpty(formNotes);
+
+            foreach (var line in valid)
+            {
+                order.Items.Add(new SalesOrderItem
+                {
+                    ProductId = line.ProductId,
+                    Quantity = line.QuantityValue,
+                    UnitPrice = line.UnitPriceValue,
+                    DiscountPercent = line.DiscountValue
+                });
+            }
+
+            await Db.SaveChangesAsync();
+            await AuditAsync(
+                editing is null ? "افزودن" : "ویرایش",
+                "سفارش فروش",
+                order.Id,
+                $"سفارش «{order.OrderNumber}» با {valid.Count} قلم و مبلغ {Money(order.Items.Sum(i => i.LineTotal))} ذخیره شد (پیش‌نویس)");
+
+            Toasts.ShowSuccess($"سفارش «{order.OrderNumber}» ذخیره شد");
+            await ResetFormAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void StartEdit(SalesOrder order)
+    {
+        editing = order;
+        formPartyId = order.PartyId;
+        formWarehouseId = order.WarehouseId ?? 0;
+        formDate = order.OrderDate;
+        formNotes = order.Notes;
+
+        lines = order.Items
+            .Select(i => new LineDraft
+            {
+                ProductId = i.ProductId,
+                Quantity = i.Quantity.ToString(CultureInfo.InvariantCulture),
+                UnitPrice = i.UnitPrice.ToString(CultureInfo.InvariantCulture),
+                Discount = i.DiscountPercent.ToString(CultureInfo.InvariantCulture)
+            })
+            .ToList();
+
+        if (lines.Count == 0)
+        {
+            AddLine();
+        }
+    }
+
+    private async Task ResetFormAsync()
+    {
+        editing = null;
+        formPartyId = 0;
+        formWarehouseId = 0;
+        formDate = DateTime.Today;
+        formNotes = null;
+        lines = new List<LineDraft>();
+        AddLine();
+        nextNumber = await CrmService.NextOrderNumberAsync(Db);
+    }
+
+    private void ResetForm()
+    {
+        _ = ResetFormAsync();
+    }
+
+    private async Task ConfirmOrderAsync(SalesOrder order)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm",
+            $"سفارش «{order.OrderNumber}» تأیید و از انبار کسر شود؟ پس از تأیید قابل ویرایش نیست.");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            var result = await CrmService.ConfirmOrderAsync(Db, order.Id, currentUsername);
+
+            if (result.Ok)
+            {
+                Toasts.ShowSuccess(result.Message);
+            }
+            else
+            {
+                Toasts.ShowError(result.Message);
+            }
+
+            await ResetFormAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در تأیید سفارش: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task CancelOrderAsync(SalesOrder order)
+    {
+        var reason = "لغو توسط کاربر";
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"سفارش «{order.OrderNumber}» لغو شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            var target = await Db.SalesOrders.FirstAsync(o => o.Id == order.Id);
+
+            if (target.Status == OrderStatus.Confirmed)
+            {
+                Toasts.ShowError("سفارش تأییدشده قابل لغو نیست");
+                return;
+            }
+
+            target.Status = OrderStatus.Canceled;
+            target.CancelReason = reason;
+
+            await Db.SaveChangesAsync();
+            await AuditAsync("لغو", "سفارش فروش", target.Id, $"سفارش «{target.OrderNumber}» لغو شد");
+            Toasts.ShowSuccess("سفارش لغو شد");
+
+            await ResetFormAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteAsync(SalesOrder order)
+    {
+        if (order.Status == OrderStatus.Confirmed)
+        {
+            Toasts.ShowError("سفارش تأییدشده حذف نمی‌شود؛ برای حفظ سابقه، آن را نگه دارید");
+            return;
+        }
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"سفارش «{order.OrderNumber}» حذف شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            var target = await Db.SalesOrders
+                .Include(o => o.Items)
+                .FirstAsync(o => o.Id == order.Id);
+
+            Db.SalesOrders.Remove(target);
+            await Db.SaveChangesAsync();
+            await AuditAsync("حذف", "سفارش فروش", target.Id, $"سفارش «{target.OrderNumber}» حذف شد");
+            Toasts.ShowSuccess("سفارش حذف شد");
+
+            await ResetFormAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = orders.ToList();
+            if (data.Count == 0)
+            {
+                Toasts.ShowError("داده‌ای برای خروجی وجود ندارد");
+                return;
+            }
+
+            var rows = new List<OrderExportRow>();
+
+            foreach (var order in data)
+            {
+                if (order.Items.Count == 0)
+                {
+                    rows.Add(new OrderExportRow(
+                        order.OrderNumber, order.Party?.Name, order.Warehouse?.Name,
+                        order.OrderDate, null, null, null, null, null, null,
+                        order.StatusTitle, order.Username));
+                    continue;
+                }
+
+                foreach (var item in order.Items)
+                {
+                    rows.Add(new OrderExportRow(
+                        order.OrderNumber, order.Party?.Name, order.Warehouse?.Name,
+                        order.OrderDate, item.Product?.Name, item.Quantity, item.UnitPrice,
+                        item.DiscountPercent, item.LineTotal, order.Total,
+                        order.StatusTitle, order.Username));
+                }
+            }
+
+            var columns = new Dictionary<string, Func<OrderExportRow, object?>>
+            {
+                ["شمارهٔ سفارش"] = r => r.OrderNumber,
+                ["مشتری"] = r => r.Party,
+                ["انبار"] = r => r.Warehouse,
+                ["تاریخ سفارش"] = r => r.OrderDate,
+                ["کالا"] = r => r.Product,
+                ["تعداد"] = r => r.Quantity,
+                ["قیمت واحد"] = r => r.UnitPrice,
+                ["تخفیف (٪)"] = r => r.Discount,
+                ["جمع قلم"] = r => r.LineTotal,
+                ["جمع کل سفارش"] = r => r.OrderTotal,
+                ["وضعیت"] = r => r.Status,
+                ["ثبت‌کننده"] = r => r.Username
+            };
+
+            var now = DateTime.Now;
+            var title = $"سفارش‌های فروش  |  تاریخ: {PersianDate.ToDate(now)}  |  تعداد سفارش: {data.Count}";
+
+            var bytes = Excel.Export(rows, "سفارش‌های فروش", columns, title);
+            var fileName = $"SalesOrders_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {rows.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = currentUsername
+        });
+
+        await Db.SaveChangesAsync();
+    }
+
+    private static decimal ParseNum(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return 0m;
+        }
+
+        var clean = text.Trim()
+            .Replace("٫", ".")
+            .Replace("٬", "")
+            .Replace(",", "");
+
+        return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0m;
+    }
+
+    /// <summary>یک قلم در حال ویرایش — مقادیر متنی‌اند تا ورودی فارسی/انگلیسی مشکل نسازد</summary>
+    private class LineDraft
+    {
+        public int ProductId { get; set; }
+        public string Quantity { get; set; } = "1";
+        public string UnitPrice { get; set; } = "0";
+        public string Discount { get; set; } = "0";
+
+        public int QuantityValue => (int)ParseNum(Quantity);
+        public decimal UnitPriceValue => ParseNum(UnitPrice);
+        public decimal DiscountValue => Math.Clamp(ParseNum(Discount), 0m, 100m);
+        public decimal Total => Math.Round(QuantityValue * UnitPriceValue * (1 - DiscountValue / 100m), 0);
+    }
+
+    private record OrderExportRow(
+        string OrderNumber, string? Party, string? Warehouse, DateTime OrderDate,
+        string? Product, int? Quantity, decimal? UnitPrice, decimal? Discount,
+        decimal? LineTotal, decimal? OrderTotal, string Status, string? Username);
+}

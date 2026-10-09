@@ -18,6 +18,12 @@ namespace WarehouseApp.Data
         public DbSet<Role> Roles { get; set; }           // نقش‌ها و اختیارات
         public DbSet<Party> Parties { get; set; }         // مشتریان و تأمین‌کنندگان
 
+        // ===== بخش CRM =====
+        public DbSet<CrmInteraction> CrmInteractions { get; set; }   // پیگیری‌ها
+        public DbSet<CrmOpportunity> CrmOpportunities { get; set; }  // فرصت‌های فروش
+        public DbSet<SalesOrder> SalesOrders { get; set; }           // سفارش‌های فروش
+        public DbSet<SalesOrderItem> SalesOrderItems { get; set; }   // اقلام سفارش
+
         // 👇 متد جدید برای تنظیم رفتار حذف دسته
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -54,6 +60,54 @@ namespace WarehouseApp.Data
                 .HasForeignKey(e => e.RoleId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // ===== CRM =====
+
+            // پیگیری‌ها و فرصت‌ها همراه طرف حساب پاک می‌شوند
+            modelBuilder.Entity<CrmInteraction>()
+                .HasOne(i => i.Party)
+                .WithMany()
+                .HasForeignKey(i => i.PartyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CrmOpportunity>()
+                .HasOne(o => o.Party)
+                .WithMany()
+                .HasForeignKey(o => o.PartyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // شمارهٔ سفارش یکتا است
+            modelBuilder.Entity<SalesOrder>()
+                .HasIndex(o => o.OrderNumber)
+                .IsUnique();
+
+            // طرف حسابی که سفارش دارد پاک نمی‌شود (سابقهٔ مالی حفظ می‌شود)
+            modelBuilder.Entity<SalesOrder>()
+                .HasOne(o => o.Party)
+                .WithMany()
+                .HasForeignKey(o => o.PartyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // اگر انبار حذف شود، سفارش می‌ماند ولی انبارش خالی می‌شود
+            modelBuilder.Entity<SalesOrder>()
+                .HasOne(o => o.Warehouse)
+                .WithMany()
+                .HasForeignKey(o => o.WarehouseId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // اقلام همراه سفارش پاک می‌شوند
+            modelBuilder.Entity<SalesOrderItem>()
+                .HasOne(i => i.SalesOrder)
+                .WithMany(o => o.Items)
+                .HasForeignKey(i => i.SalesOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // کالایی که در سفارش آمده پاک نمی‌شود
+            modelBuilder.Entity<SalesOrderItem>()
+                .HasOne(i => i.Product)
+                .WithMany()
+                .HasForeignKey(i => i.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ===== نقش‌های پیش‌فرض =====
             modelBuilder.Entity<Role>().HasData(
                 new Role
@@ -70,7 +124,7 @@ namespace WarehouseApp.Data
                 {
                     Id = 2,
                     Name = "مدیر انبار",
-                    Description = "همهٔ عملیات انبار و گزارش‌ها، بدون مدیریت کارمندان",
+                    Description = "همهٔ عملیات انبار، گزارش‌ها و CRM، بدون مدیریت کارمندان و نقش‌ها",
                     IsSystemRole = true,
                     IsActive = true,
                     Permissions = Permissions.All & ~Permissions.ManageEmployees & ~Permissions.ManageRoles

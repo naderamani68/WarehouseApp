@@ -63,6 +63,51 @@
             </NavLink>
         </div>
 
+        @* ===== بخش مشتریان، فروش و پیگیری (CRM) ===== *@
+        @if (canViewCrm)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="crm" Match="NavLinkMatch.All">
+                    <span class="bi bi-speedometer2 me-2" aria-hidden="true"></span>
+                    داشبورد فروش
+                </NavLink>
+            </div>
+        }
+
+        @if (canViewParties)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="crm/parties">
+                    <span class="bi bi-people me-2" aria-hidden="true"></span>
+                    مشتریان و تأمین‌کنندگان
+                </NavLink>
+            </div>
+        }
+
+        @if (canViewCrm)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="crm/interactions">
+                    <span class="bi bi-telephone-outbound me-2" aria-hidden="true"></span>
+                    پیگیری‌ها
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="crm/opportunities">
+                    <span class="bi bi-graph-up-arrow me-2" aria-hidden="true"></span>
+                    فرصت‌های فروش
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="crm/orders">
+                    <span class="bi bi-receipt me-2" aria-hidden="true"></span>
+                    سفارش‌های فروش
+                </NavLink>
+            </div>
+        }
+
         @* ===== آیتم‌های مدیریتی (بر اساس اختیار کاربر) ===== *@
         @if (canManageEmployees)
         {
@@ -70,16 +115,6 @@
                 <NavLink class="nav-link" href="employees">
                     <span class="bi bi-people-fill me-2" aria-hidden="true"></span>
                     کارمندان
-                </NavLink>
-            </div>
-        }
-         @* ===== بخش مشتریان و تأمین‌کنندگان (CRM) ===== *@
-        @if (canViewParties)
-        {
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="crm/parties">
-                    <span class="bi bi-people me-2" aria-hidden="true"></span>
-                    مشتریان و تأمین‌کنندگان
                 </NavLink>
             </div>
         }
@@ -104,6 +139,7 @@
     private bool canManageEmployees;
     private bool canViewAuditLog;
     private bool canViewParties;
+    private bool canViewCrm;
 
     protected override async Task OnInitializedAsync()
     {
@@ -114,5 +150,6 @@
         canManageRoles = (permissions & Permissions.ManageRoles) == Permissions.ManageRoles;
         canViewAuditLog = (permissions & Permissions.ViewAuditLog) == Permissions.ViewAuditLog;
         canViewParties = (permissions & Permissions.ViewParties) == Permissions.ViewParties;
+        canViewCrm = (permissions & Permissions.ViewCrm) == Permissions.ViewCrm;
     }
 }

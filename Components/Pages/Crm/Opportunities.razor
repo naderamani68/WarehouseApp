@@ -1,0 +1,595 @@
+﻿@page "/crm/opportunities"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject ExcelService Excel
+@inject ToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>فرصت‌های فروش | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">💼 فرصت‌های فروش</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3">@(editing is null ? "ثبت فرصت فروش جدید" : $"ویرایش فرصت: {editing.Title}")</h5>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">طرف حساب</label>
+                <select class="form-select" @bind="formPartyId">
+                    <option value="0">— انتخاب کنید —</option>
+                    @foreach (var p in parties)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">عنوان معامله</label>
+                <input class="form-control" @bind="formTitle" placeholder="مثلاً: خرید ۱۰۰ کارتن روغن" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">مبلغ (ریال)</label>
+                <input class="form-control" dir="ltr" @bind="formAmount" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">احتمال موفقیت (٪)</label>
+                <input class="form-control" dir="ltr" @bind="formProbability" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">مرحله</label>
+                <select class="form-select" @bind="formStage">
+                    <option value="@OpportunityStage.New">فرصت تازه</option>
+                    <option value="@OpportunityStage.Contacted">تماس برقرار شد</option>
+                    <option value="@OpportunityStage.Qualified">نیازسنجی</option>
+                    <option value="@OpportunityStage.Proposal">پیشنهاد قیمت</option>
+                    <option value="@OpportunityStage.Negotiation">مذاکره</option>
+                    <option value="@OpportunityStage.Won">برنده</option>
+                    <option value="@OpportunityStage.Lost">از دست رفته</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">تاریخ تخمینی بستن</label>
+                <input type="date" class="form-control" @bind="formExpectedClose" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">منبع آگاهی</label>
+                <input class="form-control" @bind="formSource" placeholder="معرفی، سایت، نمایشگاه، تماس ورودی..." />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">یادداشت</label>
+                <textarea class="form-control" rows="2" @bind="formNotes"></textarea>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@busy">
+                    @(editing is null ? "ثبت فرصت" : "ذخیره تغییرات")
+                </button>
+                @if (editing is not null)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@busy">انصراف</button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <h6 class="mb-3">قیف فروش</h6>
+        <div class="row g-2">
+            @foreach (var stage in pipeline)
+            {
+                <div class="col">
+                    <div class="card p-2 h-100 text-center">
+                        <div class="small text-muted">@stage.Title</div>
+                        <div class="fs-5 fw-bold">@stage.Count.ToString("N0", Fa)</div>
+                        <div class="small">@Money(stage.Amount)</div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">جستجو</label>
+                <input class="form-control" @bind="search" @bind:after="LoadAsync" placeholder="عنوان، یادداشت یا طرف حساب..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">مرحله</label>
+                <select class="form-select" @bind="filterStage" @bind:after="LoadAsync">
+                    <option value="0">— همه —</option>
+                    <option value="@OpportunityStage.New">فرصت تازه</option>
+                    <option value="@OpportunityStage.Contacted">تماس برقرار شد</option>
+                    <option value="@OpportunityStage.Qualified">نیازسنجی</option>
+                    <option value="@OpportunityStage.Proposal">پیشنهاد قیمت</option>
+                    <option value="@OpportunityStage.Negotiation">مذاکره</option>
+                    <option value="@OpportunityStage.Won">برنده</option>
+                    <option value="@OpportunityStage.Lost">از دست رفته</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">وضعیت معامله</label>
+                <select class="form-select" @bind="filterOpen" @bind:after="LoadAsync">
+                    <option value="open">باز</option>
+                    <option value="closed">بسته‌شده</option>
+                    <option value="all">همه</option>
+                </select>
+            </div>
+            <div class="col-md-2 text-end">
+                <button class="btn btn-success w-100" @onclick="ExportAsync" disabled="@(!CanExport || isExporting)">
+                    @if (isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-excel"></i>
+                        <span>Excel</span>
+                    }
+                </button>
+            </div>
+        </div>
+        <div class="text-muted small mt-2">
+            @items.Count.ToString("N0", Fa) فرصت — جمع مبلغ: @Money(items.Sum(i => i.Amount)) — جمع وزن‌دار: @Money(items.Sum(i => i.WeightedAmount))
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>عنوان</th>
+                        <th>طرف حساب</th>
+                        <th>مرحله</th>
+                        <th>مبلغ</th>
+                        <th>احتمال</th>
+                        <th>وزن‌دار</th>
+                        <th>بستن</th>
+                        <th>منبع</th>
+                        <th style="width:230px">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">فرصتی برای نمایش نیست.</td>
+                        </tr>
+                    }
+                    @foreach (var item in items)
+                    {
+                        <tr class="@(item.IsLate ? "table-warning" : "")">
+                            <td>
+                                <div>@item.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                {
+                                    <div class="text-muted small">@item.Notes</div>
+                                }
+                            </td>
+                            <td><a href="@($"crm/parties/{item.PartyId}")">@(item.Party?.Name ?? "—")</a></td>
+                            <td>
+                                @if (CanManage && !item.IsClosed)
+                                {
+                                    <select class="form-select form-select-sm" style="min-width:150px"
+                                            value="@item.Stage"
+                                            @onchange="e => ChangeStageAsync(item, e)">
+                                        <option value="@OpportunityStage.New">فرصت تازه</option>
+                                        <option value="@OpportunityStage.Contacted">تماس برقرار شد</option>
+                                        <option value="@OpportunityStage.Qualified">نیازسنجی</option>
+                                        <option value="@OpportunityStage.Proposal">پیشنهاد قیمت</option>
+                                        <option value="@OpportunityStage.Negotiation">مذاکره</option>
+                                        <option value="@OpportunityStage.Won">برنده</option>
+                                        <option value="@OpportunityStage.Lost">از دست رفته</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <span class="badge @item.StageBadge">@item.StageTitle</span>
+                                }
+                            </td>
+                            <td class="small">@Money(item.Amount)</td>
+                            <td class="small">@item.Probability.ToString("N0", Fa)٪</td>
+                            <td class="small">@Money(item.WeightedAmount)</td>
+                            <td class="small text-muted" dir="ltr">@PersianDate.OrDash(item.ExpectedCloseAt)</td>
+                            <td class="small">@(string.IsNullOrWhiteSpace(item.Source) ? "—" : item.Source)</td>
+                            <td>
+                                @if (CanManage)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(item)">ویرایش</button>
+                                    @if (item.Stage != OpportunityStage.Won)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success me-1" @onclick="() => SetStageAsync(item, OpportunityStage.Won)">برنده</button>
+                                    }
+                                    @if (item.Stage != OpportunityStage.Lost)
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => SetStageAsync(item, OpportunityStage.Lost)">باخت</button>
+                                    }
+                                }
+                                @if (CanDelete)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool CanDelete;
+    private bool CanExport;
+
+    private List<Party> parties = new();
+    private List<CrmOpportunity> items = new();
+    private List<CrmStageStat> pipeline = new();
+    private CrmOpportunity? editing;
+
+    private string search = string.Empty;
+    private int filterStage;
+    private string filterOpen = "open";
+
+    private int formPartyId;
+    private string formTitle = string.Empty;
+    private string formAmount = "0";
+    private string formProbability = "20";
+    private OpportunityStage formStage = OpportunityStage.New;
+    private DateTime? formExpectedClose;
+    private string? formSource;
+    private string? formNotes;
+
+    private bool busy;
+    private bool isExporting;
+    private string? currentUsername;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        currentUsername = user?.Identity?.Name;
+
+        allowed = await Access.HasAsync(user, Permissions.ViewCrm);
+        CanManage = await Access.HasAsync(user, Permissions.ManageCrm);
+        CanDelete = await Access.HasAsync(user, Permissions.DeleteCrm);
+        CanExport = await Access.HasAsync(user, Permissions.ExportExcel);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        parties = await Db.Parties.Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = Db.CrmOpportunities.Include(o => o.Party).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(o => o.Title.Contains(term)
+                                     || (o.Notes != null && o.Notes.Contains(term))
+                                     || (o.Source != null && o.Source.Contains(term))
+                                     || (o.Party != null && o.Party.Name.Contains(term)));
+        }
+
+        if (filterStage > 0)
+        {
+            var stage = (OpportunityStage)filterStage;
+            query = query.Where(o => o.Stage == stage);
+        }
+
+        query = filterOpen switch
+        {
+            "open" => query.Where(o => o.Stage != OpportunityStage.Won && o.Stage != OpportunityStage.Lost),
+            "closed" => query.Where(o => o.Stage == OpportunityStage.Won || o.Stage == OpportunityStage.Lost),
+            _ => query
+        };
+
+        items = await query
+            .OrderBy(o => o.Stage == OpportunityStage.Won || o.Stage == OpportunityStage.Lost ? 1 : 0)
+            .ThenByDescending(o => o.Amount)
+            .ToListAsync();
+
+        await LoadPipelineAsync();
+    }
+
+    private async Task LoadPipelineAsync()
+    {
+        var groups = await Db.CrmOpportunities
+            .GroupBy(o => o.Stage)
+            .Select(g => new { Stage = g.Key, Count = g.Count(), Amount = g.Sum(x => x.Amount) })
+            .ToListAsync();
+
+        pipeline = new List<CrmStageStat>();
+        foreach (var stage in new[]
+                 {
+                     OpportunityStage.New, OpportunityStage.Contacted, OpportunityStage.Qualified,
+                     OpportunityStage.Proposal, OpportunityStage.Negotiation,
+                     OpportunityStage.Won, OpportunityStage.Lost
+                 })
+        {
+            var row = groups.FirstOrDefault(g => g.Stage == stage);
+            var sample = new CrmOpportunity { Stage = stage };
+            pipeline.Add(new CrmStageStat(stage, sample.StageTitle, row?.Count ?? 0, row?.Amount ?? 0m));
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (formPartyId <= 0)
+        {
+            Toasts.ShowError("طرف حساب را انتخاب کنید");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formTitle))
+        {
+            Toasts.ShowError("عنوان معامله را وارد کنید");
+            return;
+        }
+
+        var probability = (int)ParseNum(formProbability);
+        if (probability < 0 || probability > 100)
+        {
+            Toasts.ShowError("احتمال موفقیت باید بین ۰ تا ۱۰۰ باشد");
+            return;
+        }
+
+        try
+        {
+            busy = true;
+
+            if (editing is null)
+            {
+                var item = new CrmOpportunity
+                {
+                    PartyId = formPartyId,
+                    Title = formTitle.Trim(),
+                    Amount = ParseNum(formAmount),
+                    Probability = probability,
+                    Stage = formStage,
+                    ExpectedCloseAt = formExpectedClose?.Date,
+                    Source = NullIfEmpty(formSource),
+                    Notes = NullIfEmpty(formNotes),
+                    Username = currentUsername
+                };
+
+                if (item.IsClosed)
+                {
+                    item.ClosedAt = DateTime.Now;
+                }
+
+                Db.CrmOpportunities.Add(item);
+                await Db.SaveChangesAsync();
+                await AuditAsync("افزودن", "فرصت فروش", item.Id, $"فرصت «{item.Title}» با مبلغ {Money(item.Amount)} ثبت شد");
+                Toasts.ShowSuccess("فرصت فروش ثبت شد");
+            }
+            else
+            {
+                editing.PartyId = formPartyId;
+                editing.Title = formTitle.Trim();
+                editing.Amount = ParseNum(formAmount);
+                editing.Probability = probability;
+                editing.Stage = formStage;
+                editing.ExpectedCloseAt = formExpectedClose?.Date;
+                editing.Source = NullIfEmpty(formSource);
+                editing.Notes = NullIfEmpty(formNotes);
+                editing.ClosedAt = editing.IsClosed ? (editing.ClosedAt ?? DateTime.Now) : null;
+
+                await Db.SaveChangesAsync();
+                await AuditAsync("ویرایش", "فرصت فروش", editing.Id, $"فرصت «{editing.Title}» ویرایش شد");
+                Toasts.ShowSuccess("تغییرات ذخیره شد");
+            }
+
+            CancelEdit();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void StartEdit(CrmOpportunity item)
+    {
+        editing = item;
+        formPartyId = item.PartyId;
+        formTitle = item.Title;
+        formAmount = item.Amount.ToString(CultureInfo.InvariantCulture);
+        formProbability = item.Probability.ToString(CultureInfo.InvariantCulture);
+        formStage = item.Stage;
+        formExpectedClose = item.ExpectedCloseAt;
+        formSource = item.Source;
+        formNotes = item.Notes;
+    }
+
+    private void CancelEdit()
+    {
+        editing = null;
+        formPartyId = 0;
+        formTitle = string.Empty;
+        formAmount = "0";
+        formProbability = "20";
+        formStage = OpportunityStage.New;
+        formExpectedClose = null;
+        formSource = null;
+        formNotes = null;
+    }
+
+    private async Task ChangeStageAsync(CrmOpportunity item, ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var value))
+        {
+            return;
+        }
+
+        await SetStageAsync(item, (OpportunityStage)value);
+    }
+
+    private async Task SetStageAsync(CrmOpportunity item, OpportunityStage stage)
+    {
+        try
+        {
+            var previous = item.StageTitle;
+            item.Stage = stage;
+            item.ClosedAt = item.IsClosed ? DateTime.Now : null;
+
+            if (stage == OpportunityStage.Won && item.Probability < 100)
+            {
+                item.Probability = 100;
+            }
+
+            await Db.SaveChangesAsync();
+            await AuditAsync("ویرایش", "فرصت فروش", item.Id, $"مرحلهٔ فرصت «{item.Title}» از «{previous}» به «{item.StageTitle}» تغییر کرد");
+            Toasts.ShowSuccess($"مرحله به «{item.StageTitle}» تغییر کرد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteAsync(CrmOpportunity item)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"فرصت «{item.Title}» حذف شود؟");
+        if (!ok)
+        {
+            return;
+        }
+
+        try
+        {
+            Db.CrmOpportunities.Remove(item);
+            await Db.SaveChangesAsync();
+            await AuditAsync("حذف", "فرصت فروش", item.Id, $"فرصت «{item.Title}» حذف شد");
+            Toasts.ShowSuccess("فرصت فروش حذف شد");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در حذف: {ex.Message}");
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (!CanExport)
+        {
+            Toasts.ShowError("شما اجازهٔ گرفتن خروجی اکسل را ندارید");
+            return;
+        }
+
+        try
+        {
+            isExporting = true;
+
+            var data = items.ToList();
+            if (data.Count == 0)
+            {
+                Toasts.ShowError("داده‌ای برای خروجی وجود ندارد");
+                return;
+            }
+
+            var columns = new Dictionary<string, Func<CrmOpportunity, object?>>
+            {
+                ["عنوان"] = o => o.Title,
+                ["طرف حساب"] = o => o.Party?.Name,
+                ["مرحله"] = o => o.StageTitle,
+                ["مبلغ"] = o => o.Amount.ToString("N0", CultureInfo.InvariantCulture),
+                ["احتمال (٪)"] = o => o.Probability,
+                ["مبلغ وزن‌دار"] = o => o.WeightedAmount.ToString("N0", CultureInfo.InvariantCulture),
+                ["تاریخ تخمینی بستن"] = o => o.ExpectedCloseAt,
+                ["منبع"] = o => o.Source,
+                ["یادداشت"] = o => o.Notes,
+                ["مسئول"] = o => o.Username,
+                ["تاریخ ثبت"] = o => o.CreatedAt
+            };
+
+            var now = DateTime.Now;
+            var title = $"فرصت‌های فروش  |  تاریخ: {PersianDate.ToDate(now)}  |  تعداد: {data.Count}  |  جمع: {Money(data.Sum(o => o.Amount))}";
+
+            var bytes = Excel.Export(data, "فرصت‌های فروش", columns, title);
+            var fileName = $"CrmOpportunities_{now:yyyyMMdd_HHmm}.xlsx";
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, Convert.ToBase64String(bytes));
+            Toasts.ShowSuccess($"خروجی با {data.Count} ردیف ساخته شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خروجی Excel: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private static decimal ParseNum(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return 0m;
+        }
+
+        var clean = text.Trim()
+            .Replace("٫", ".")
+            .Replace("٬", "")
+            .Replace(",", "");
+
+        return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0m;
+    }
+
+    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task AuditAsync(string action, string entity, int? entityId, string details)
+    {
+        Db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            Entity = entity,
+            EntityId = entityId,
+            Details = details,
+            Username = currentUsername
+        });
+
+        await Db.SaveChangesAsync();
+    }
+}
