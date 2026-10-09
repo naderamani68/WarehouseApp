@@ -1,4 +1,4 @@
-.page {
+﻿.page {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -74,6 +74,42 @@ main {
         padding-left: 2rem !important;
         padding-right: 1.5rem !important;
     }
+}
+
+/* ===== باز و بستن منوی کنار ===== */
+
+/* چک‌باکس مخفی — از جریان صفحه بیرون است تا چیدمان را به هم نزند */
+.sidebar-toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* وقتی تیک خورده باشد، منوی کنار پنهان می‌شود و محتوا تمام عرض را می‌گیرد */
+.sidebar-toggle-input:checked ~ .sidebar {
+    display: none;
+}
+
+.sidebar-toggle-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    margin: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 0.4rem;
+    background: transparent;
+    color: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: rgba(128, 128, 128, 0.15);
 }
 
 #blazor-error-ui {

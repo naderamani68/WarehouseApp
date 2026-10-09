@@ -47,6 +47,24 @@
         Blazor.addEventListener('enhancedload', reapplyTheme);
     </script>
 
+    @* 🔧 به‌خاطر سپردن وضعیت منوی کنار (باز یا بسته) بین صفحه‌ها *@
+    <script>
+        function applySidebarState() {
+            const box = document.getElementById('sidebar-toggle');
+            if (!box) return;
+            box.checked = localStorage.getItem('sidebarHidden') === 'true';
+        }
+
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.id === 'sidebar-toggle') {
+                localStorage.setItem('sidebarHidden', e.target.checked ? 'true' : 'false');
+            }
+        });
+
+        applySidebarState();
+        Blazor.addEventListener('enhancedload', applySidebarState);
+    </script>
+
     <script src="js/fileDownload.js"></script>
     <script src="js/latinInput.js"></script>
 

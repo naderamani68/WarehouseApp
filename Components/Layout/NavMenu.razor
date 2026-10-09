@@ -13,51 +13,45 @@
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+<div class="nav-scrollable">
     <nav class="flex-column">
 
         @{
             var visibleSections = sections.Where(s => s.Items.Count > 0).ToList();
+            var activeKey = ActiveSectionKey;
         }
 
         @for (var i = 0; i < visibleSections.Count; i++)
         {
             var grp = visibleSections[i];
-            var isOpen = IsOpen(grp.Key);
-            var isActive = ActiveSectionKey == grp.Key;
 
             @if (i > 0)
             {
                 <hr class="mx-3 my-1 opacity-25" />
             }
 
-            <div class="nav-group">
-                <button type="button"
-                        class="nav-link w-100 d-flex justify-content-between align-items-center border-0 bg-transparent text-start @(isActive ? "fw-bold" : "")"
-                        aria-expanded="@(isOpen ? "true" : "false")"
-                        @onclick="() => Toggle(grp.Key)"
-                        @onclick:stopPropagation="true">
+            @* عنصر details به‌صورت بومی مرورگر باز و بسته می‌شود — نیازی به کد تعاملی نیست *@
+            <details class="nav-group" open="@(activeKey == grp.Key ? "open" : null)">
+                <summary class="nav-group-header">
                     <span class="d-flex align-items-center">
                         <span class="bi @grp.Icon me-2" aria-hidden="true"></span>
                         <span>@grp.Title</span>
                     </span>
-                    <span class="bi @(isOpen ? "bi-chevron-up" : "bi-chevron-down") small" aria-hidden="true"></span>
-                </button>
+                    <span class="bi bi-chevron-down nav-group-chevron" aria-hidden="true"></span>
+                </summary>
 
-                @if (isOpen)
+                @foreach (var item in grp.Items)
                 {
-                    @foreach (var item in grp.Items)
-                    {
-                        <div class="nav-item px-3">
-                            <NavLink class="nav-link" href="@item.Href"
-                                     Match="@(item.Exact ? NavLinkMatch.All : NavLinkMatch.Prefix)">
-                                <span class="bi @item.Icon me-2" aria-hidden="true"></span>
-                                @item.Title
-                            </NavLink>
-                        </div>
-                    }
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="@item.Href"
+                                 Match="@(item.Exact ? NavLinkMatch.All : NavLinkMatch.Prefix)"
+                                 onclick="document.querySelector('.navbar-toggler').click()">
+                            <span class="bi @item.Icon me-2" aria-hidden="true"></span>
+                            @item.Title
+                        </NavLink>
+                    </div>
                 }
-            </div>
+            </details>
         }
 
     </nav>
@@ -78,12 +72,9 @@
     private bool canViewFinance;
     private bool canManageSettings;
 
-    /// <summary>دسته‌هایی که کاربر بسته است — پیش‌فرض همه باز هستند</summary>
-    private readonly HashSet<string> collapsed = new();
-
     private List<NavSection> sections = new();
 
-    /// <summary>دستهٔ مربوط به صفحهٔ فعلی — برای پررنگ کردن عنوان آن</summary>
+    /// <summary>دستهٔ مربوط به صفحهٔ فعلی — فقط همین دسته به‌طور پیش‌فرض باز است</summary>
     private string? ActiveSectionKey
     {
         get
@@ -191,15 +182,5 @@
             new("finance", "مالی و حسابداری", "bi-cash-stack", finance),
             new("admin", "مدیریت سیستم", "bi-gear", admin)
         };
-    }
-
-    private bool IsOpen(string key) => !collapsed.Contains(key);
-
-    private void Toggle(string key)
-    {
-        if (!collapsed.Add(key))
-        {
-            collapsed.Remove(key);
-        }
     }
 }
