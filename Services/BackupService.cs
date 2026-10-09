@@ -21,6 +21,14 @@ public class BackupService
 {
     public const string FolderKey = "Backup.Folder";
     public const string KeepDaysKey = "Backup.KeepDays";
+    public const string AutoEnabledKey = "Backup.AutoEnabled";
+    public const string AutoHourKey = "Backup.AutoHour";
+    public const string LastRunKey = "Backup.LastRunAt";
+    public const string LastResultKey = "Backup.LastResult";
+    public const string GrantedFolderKey = "Backup.GrantedFolder";
+
+    /// <summary>تا دو پشتیبان‌گیری هم‌زمان با هم اجرا نشوند</summary>
+    private static readonly SemaphoreSlim Gate = new(1, 1);
 
     private readonly ApplicationDbContext db;
     private readonly IWebHostEnvironment env;
@@ -94,6 +102,71 @@ public class BackupService
         }
     }
 
+    public async Task<bool> GetAutoEnabledAsync()
+        => (await SettingAsync(AutoEnabledKey)).Equals("true", StringComparison.OrdinalIgnoreCase);
+
+    public async Task<int> GetAutoHourAsync()
+    {
+        var value = await SettingAsync(AutoHourKey);
+
+        return int.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var hour) && hour >= 0 && hour <= 23
+            ? hour
+            : 23;
+    }
+
+    public async Task<DateTime?> GetLastRunAsync()
+    {
+        var value = await SettingAsync(LastRunKey);
+
+        return DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)
+            ? at
+            : null;
+    }
+
+    public async Task<string> GetLastResultAsync() => await SettingAsync(LastResultKey);
+
+    public async Task SaveAutoAsync(bool enabled, int hour)
+    {
+        await SetAsync(AutoEnabledKey, enabled ? "true" : "false");
+        await SetAsync(AutoHourKey, Math.Clamp(hour, 0, 23).ToString(CultureInfo.InvariantCulture));
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<string> SettingAsync(string key)
+        => await db.AppSettings.Where(s => s.Key == key).Select(s => s.Value).FirstOrDefaultAsync() ?? string.Empty;
+
+    /// <summary>
+    /// پشتیبان‌گیری خودکار — فقط اگر روشن باشد، به ساعت مقرر رسیده باشیم
+    /// و امروز پشتیبانی گرفته نشده باشد.
+    /// </summary>
+    public async Task RunAutoAsync()
+    {
+        if (!await GetAutoEnabledAsync())
+        {
+            return;
+        }
+
+        if (DateTime.Now.Hour < await GetAutoHourAsync())
+        {
+            return;
+        }
+
+        var last = await GetLastRunAsync();
+
+        if (last.HasValue && last.Value.Date == DateTime.Today)
+        {
+            return;
+        }
+
+        logger.LogInformation("شروع پشتیبان‌گیری خودکار");
+
+        var result = await RunAsync();
+
+        await SetAsync(LastRunKey, DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+        await SetAsync(LastResultKey, result.Success ? $"موفق — {result.Message}" : $"ناموفق — {result.Message}");
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>فهرست پشتیبان‌های موجود، از تازه به قدیم</summary>
     public List<BackupFile> ListBackups(string folder)
     {
@@ -111,6 +184,23 @@ public class BackupService
 
     public async Task<BackupResult> RunAsync()
     {
+        if (!await Gate.WaitAsync(TimeSpan.FromSeconds(5)))
+        {
+            return new BackupResult(false, "یک پشتیبان‌گیری دیگر در جریان است؛ چند لحظه بعد دوباره تلاش کن.", null, null, 0, 0, 0);
+        }
+
+        try
+        {
+            return await RunCoreAsync();
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    private async Task<BackupResult> RunCoreAsync()
+    {
         try
         {
             var folder = await GetFolderAsync();
@@ -126,6 +216,20 @@ public class BackupService
 
             // پایگاه دادهٔ بزرگ می‌تواند بیشتر از مهلت پیش‌فرض طول بکشد
             db.Database.SetCommandTimeout(900);
+
+            // سرویس پایگاه داده معمولاً اجازهٔ نوشتن در پوشهٔ کاربر را ندارد.
+            // پس پیش از تلاش اول، یک بار دسترسی نوشتن به آن حساب داده می‌شود تا
+            // پشتیبان‌گیری از همان ابتدا بی‌خطا انجام شود.
+            if (!SameFolder(await SettingAsync(GrantedFolderKey), folder))
+            {
+                var serviceAccount = await GetSqlServiceAccountAsync();
+
+                if (await GrantAccessAsync(folder, serviceAccount))
+                {
+                    await SetAsync(GrantedFolderKey, folder);
+                    await db.SaveChangesAsync();
+                }
+            }
 
             if (!await TryBackupAsync(safeDatabase, Escape(file)))
             {
@@ -267,6 +371,12 @@ public class BackupService
             return false;
         }
     }
+
+    private static bool SameFolder(string first, string second)
+        => string.Equals(
+            first.TrimEnd('\\', '/'),
+            second.TrimEnd('\\', '/'),
+            StringComparison.OrdinalIgnoreCase);
 
     private static string Escape(string value) => value.Replace("'", "''");
 

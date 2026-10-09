@@ -47,6 +47,7 @@ builder.Services.AddScoped<ShopCatalogService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<SmsService>();
 builder.Services.AddScoped<BackupService>();
+builder.Services.AddHostedService<BackupSchedulerService>();
 
 // ===== محدودسازی نرخ درخواست =====
 // فروشگاه عمومی سهم کمتری دارد تا یک ربات نتواند پنل انبار را از کار بیندازد.

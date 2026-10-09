@@ -67,6 +67,37 @@ else
                     <div class="form-text">صفر یعنی هیچ پشتیبانی خودکار پاک نشود.</div>
                 </div>
 
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="autoBackup" @bind="autoEnabled" disabled="@(!CanManage)" />
+                    <label class="form-check-label" for="autoBackup">پشتیبان‌گیری خودکار روزانه</label>
+                </div>
+
+                @if (autoEnabled)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">ساعت اجرای خودکار</label>
+                        <input type="number" class="form-control" dir="ltr" style="max-width:140px" min="0" max="23" @bind="autoHour" disabled="@(!CanManage)" />
+                        <div class="form-text">
+                            اگر برنامه در آن ساعت خاموش باشد، اولین باری که روشن شد پشتیبان گرفته می‌شود.
+                        </div>
+                    </div>
+                }
+
+                <div class="text-muted small mb-3">
+                    @if (lastRun is null)
+                    {
+                        <span>هنوز پشتیبان‌گیری خودکاری انجام نشده است.</span>
+                    }
+                    else
+                    {
+                        <span>آخرین پشتیبان‌گیری خودکار: @PersianDate.ToDateTime(lastRun.Value)</span>
+                        @if (lastResult.Length > 0)
+                        {
+                            <span> — @lastResult</span>
+                        }
+                    }
+                </div>
+
                 @if (CanManage)
                 {
                     <div class="d-flex flex-wrap gap-2">
@@ -166,6 +197,10 @@ else
 
     private string folder = string.Empty;
     private int keepDays = 30;
+    private bool autoEnabled;
+    private int autoHour = 23;
+    private DateTime? lastRun;
+    private string lastResult = string.Empty;
     private List<BackupFile> backups = new();
     private BackupResult? result;
 
@@ -193,6 +228,10 @@ else
 
         folder = await BackupSvc.GetFolderAsync();
         keepDays = await BackupSvc.GetKeepDaysAsync();
+        autoEnabled = await BackupSvc.GetAutoEnabledAsync();
+        autoHour = await BackupSvc.GetAutoHourAsync();
+        lastRun = await BackupSvc.GetLastRunAsync();
+        lastResult = await BackupSvc.GetLastResultAsync();
         backups = BackupSvc.ListBackups(folder);
     }
 
@@ -200,6 +239,10 @@ else
     {
         folder = await BackupSvc.GetFolderAsync();
         keepDays = await BackupSvc.GetKeepDaysAsync();
+        autoEnabled = await BackupSvc.GetAutoEnabledAsync();
+        autoHour = await BackupSvc.GetAutoHourAsync();
+        lastRun = await BackupSvc.GetLastRunAsync();
+        lastResult = await BackupSvc.GetLastResultAsync();
         backups = BackupSvc.ListBackups(folder);
     }
 
@@ -210,6 +253,7 @@ else
             busy = true;
 
             await BackupSvc.SaveSettingsAsync(folder, keepDays);
+            await BackupSvc.SaveAutoAsync(autoEnabled, autoHour);
             backups = BackupSvc.ListBackups(await BackupSvc.GetFolderAsync());
             folder = await BackupSvc.GetFolderAsync();
 
