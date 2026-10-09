@@ -78,8 +78,20 @@ public class BackupService
         await db.SaveChangesAsync();
     }
 
+    /// <summary>عنوان و نوع هر کلید، تا در صفحهٔ تنظیمات درست نشان داده شود</summary>
+    private static readonly Dictionary<string, (string Title, string Type, int Order, string Hint)> Extras = new()
+    {
+        [AutoEnabledKey] = ("پشتیبان‌گیری خودکار روزانه", "bool", 10, "هر روز در ساعت تعیین‌شده خودکار پشتیبان می‌گیرد"),
+        [AutoHourKey] = ("ساعت اجرای پشتیبان‌گیری خودکار", "number", 11, "عددی از صفر تا ۲۳"),
+        [LastRunKey] = ("زمان آخرین پشتیبان‌گیری خودکار", "text", 20, ""),
+        [LastResultKey] = ("نتیجهٔ آخرین پشتیبان‌گیری خودکار", "text", 21, ""),
+        [GrantedFolderKey] = ("پوشهٔ دسترسی‌داده‌شده به سرویس پایگاه داده", "text", 30, "")
+    };
+
     private async Task SetAsync(string key, string value)
     {
+        var extra = Extras.TryGetValue(key, out var found) ? found : (Title: "", Type: "text", Order: 90, Hint: "");
+
         var row = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
 
         if (row is null)
@@ -88,10 +100,11 @@ public class BackupService
             {
                 Key = key,
                 Value = value,
-                Title = key,
+                Title = extra.Title.Length > 0 ? extra.Title : key,
                 Group = "پشتیبان‌گیری",
-                ValueType = "text",
-                SortOrder = 90,
+                ValueType = extra.Type,
+                SortOrder = extra.Order,
+                Hint = extra.Hint.Length > 0 ? extra.Hint : null,
                 UpdatedAt = DateTime.Now
             });
         }
