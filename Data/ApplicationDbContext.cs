@@ -202,6 +202,11 @@ namespace WarehouseApp.Data
                 new SalesChannel { Id = 6, Name = "فروشگاه اینترنتی", Hint = "سفارش از سایت خودمان", SortOrder = 6, CreatedAt = seedDate },
                 new SalesChannel { Id = 7, Name = "سایر", Hint = "هر جای دیگر", SortOrder = 7, CreatedAt = seedDate });
 
+            // ===== پشتیبان‌گیری =====
+            modelBuilder.Entity<AppSetting>().HasData(
+                new AppSetting { Key = "Backup.Folder", Value = "", Title = "پوشهٔ پشتیبان‌گیری (خالی = پوشهٔ backups کنار برنامه)", Group = "پشتیبان‌گیری", ValueType = "text", SortOrder = 1, UpdatedAt = seedDate },
+                new AppSetting { Key = "Backup.KeepDays", Value = "30", Title = "نگهداری پشتیبان (روز)", Group = "پشتیبان‌گیری", ValueType = "number", SortOrder = 2, UpdatedAt = seedDate });
+
             // ===== نقش‌های پیش‌فرض =====
             modelBuilder.Entity<Role>().HasData(
                 new Role

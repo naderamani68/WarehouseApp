@@ -1,0 +1,268 @@
+﻿@page "/backup"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using WarehouseApp.Services
+@using WarehouseApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject BackupService BackupSvc
+@inject ToastService Toasts
+
+@* پشتیبان‌گیری از پایگاه داده و عکس‌های کالا *@
+
+<PageTitle>پشتیبان‌گیری | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">💾 پشتیبان‌گیری</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">شما اجازهٔ دسترسی به این بخش را ندارید.</div>
+}
+else
+{
+    <div class="alert alert-warning">
+        <strong>دو چیز باید پشتیبان گرفته شود:</strong> پایگاه داده و عکس‌های کالا.
+        این صفحه هر دو را با هم می‌گیرد. پوشه‌ای بیرون از درایو برنامه انتخاب کن تا اگر آن درایو خراب شد، پشتیبان سالم بماند.
+    </div>
+
+    @if (result is not null)
+    {
+        <div class="alert @(result.Success ? "alert-success" : "alert-danger")">
+            @if (result.Success)
+            {
+                <div class="fw-bold">@result.Message</div>
+                <div class="small mt-1">
+                    حجم فایل: @FileSize(result.Size) —
+                    عکس‌های کپی‌شده: @result.UploadsCopied.ToString("N0", Fa) —
+                    پشتیبان‌های قدیمی پاک‌شده: @result.OldRemoved.ToString("N0", Fa)
+                </div>
+                <div class="small" dir="ltr">@result.FilePath</div>
+            }
+            else
+            {
+                <div class="fw-bold">پشتیبان‌گیری انجام نشد</div>
+                <div class="small mt-1" dir="ltr">@result.Message</div>
+            }
+        </div>
+    }
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card p-3 h-100">
+                <h5 class="mb-3">⚙️ تنظیمات پشتیبان</h5>
+
+                <div class="mb-3">
+                    <label class="form-label">پوشهٔ پشتیبان‌گیری</label>
+                    <input class="form-control" dir="ltr" @bind="folder" placeholder="مثلاً D:\Backup\WarehouseApp" disabled="@(!CanManage)" />
+                    <div class="form-text">اگر خالی بگذاری، پوشهٔ <span dir="ltr">backups</span> کنار خود برنامه استفاده می‌شود.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">چند روز پشتیبان نگه داشته شود؟</label>
+                    <input type="number" class="form-control" dir="ltr" style="max-width:140px" @bind="keepDays" disabled="@(!CanManage)" />
+                    <div class="form-text">صفر یعنی هیچ پشتیبانی خودکار پاک نشود.</div>
+                </div>
+
+                @if (CanManage)
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-outline-primary" @onclick="SaveSettingsAsync" disabled="@busy">
+                            ذخیرهٔ تنظیمات
+                        </button>
+
+                        <button class="btn btn-success" @onclick="RunAsync" disabled="@busy">
+                            @if (busy)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>در حال پشتیبان‌گیری…</span>
+                            }
+                            else
+                            {
+                                <span class="bi bi-download me-1" aria-hidden="true"></span>
+                                <span>گرفتن پشتیبان الان</span>
+                            }
+                        </button>
+
+                        <button class="btn btn-outline-secondary" @onclick="RefreshAsync" disabled="@busy">تازه‌سازی فهرست</button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card p-3 h-100">
+                <h5 class="mb-3">🕒 پشتیبان‌گیری خودکار روزانه</h5>
+                <p class="small mb-2">
+                    این دستور را در خط فرمان ویندوز (با دسترسی مدیر) یک بار اجرا کن تا هر شب ساعت ۲۳ پشتیبان گرفته شود:
+                </p>
+                <pre class="small mb-3" dir="ltr" style="white-space:pre-wrap">@TaskCommand</pre>
+                <p class="small mb-0">
+                    برای پاک‌کردن زمان‌بندی:
+                </p>
+                <pre class="small mb-0" dir="ltr" style="white-space:pre-wrap">schtasks /Delete /TN "WarehouseApp Backup" /F</pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-0 mt-3">
+        <div class="card-header bg-transparent">
+            <strong>پشتیبان‌های موجود</strong>
+            <span class="text-muted small">— @backups.Count.ToString("N0", Fa) فایل در @folder</span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>نام فایل</th>
+                        <th style="width:150px">تاریخ</th>
+                        <th style="width:130px">حجم</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (backups.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">هنوز پشتیبانی گرفته نشده است.</td>
+                        </tr>
+                    }
+                    @foreach (var file in backups)
+                    {
+                        <tr>
+                            <td class="small" dir="ltr">@file.Name</td>
+                            <td class="small" dir="ltr">@PersianDate.ToDateTime(file.CreatedAt)</td>
+                            <td class="small">@FileSize(file.Size)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (backups.Count > 0)
+    {
+        <div class="card p-3 mt-3">
+            <h6 class="mb-2">♻️ بازیابی پشتیبان</h6>
+            <p class="small mb-2">
+                برای بازیابی، <strong>اول برنامه را ببند</strong>، بعد این دستور را در ابزار خط فرمان پایگاه داده اجرا کن:
+            </p>
+            <pre class="small mb-0" dir="ltr" style="white-space:pre-wrap">@RestoreCommand</pre>
+        </div>
+    }
+}
+
+@code {
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool allowed;
+    private bool CanManage;
+    private bool busy;
+
+    private string folder = string.Empty;
+    private int keepDays = 30;
+    private List<BackupFile> backups = new();
+    private BackupResult? result;
+
+    private string TaskCommand => $"schtasks /Create /TN \"WarehouseApp Backup\" /TR \"powershell -ExecutionPolicy Bypass -File \\\"{BackupSvc.ScriptPath}\\\"\" /SC DAILY /ST 23:00 /RL HIGHEST";
+
+    private string RestoreCommand => backups.Count == 0
+        ? "--"
+        : $"RESTORE DATABASE [{DbName}] FROM DISK = N'{backups[0].FullPath}' WITH REPLACE";
+
+    private string DbName => Db.Database.GetDbConnection().Database;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.ManageSettings)
+                  || await Access.HasAsync(user, Permissions.ViewAuditLog);
+
+        CanManage = await Access.HasAsync(user, Permissions.ManageSettings);
+
+        if (!allowed)
+        {
+            return;
+        }
+
+        folder = await BackupSvc.GetFolderAsync();
+        keepDays = await BackupSvc.GetKeepDaysAsync();
+        backups = BackupSvc.ListBackups(folder);
+    }
+
+    private async Task RefreshAsync()
+    {
+        folder = await BackupSvc.GetFolderAsync();
+        keepDays = await BackupSvc.GetKeepDaysAsync();
+        backups = BackupSvc.ListBackups(folder);
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            busy = true;
+
+            await BackupSvc.SaveSettingsAsync(folder, keepDays);
+            backups = BackupSvc.ListBackups(await BackupSvc.GetFolderAsync());
+            folder = await BackupSvc.GetFolderAsync();
+
+            Toasts.ShowSuccess("تنظیمات پشتیبان ذخیره شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ذخیره: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RunAsync()
+    {
+        try
+        {
+            busy = true;
+            result = await BackupSvc.RunAsync();
+
+            if (result.Success)
+            {
+                Toasts.ShowSuccess(result.Message);
+            }
+            else
+            {
+                Toasts.ShowError($"پشتیبان‌گیری انجام نشد: {result.Message}");
+            }
+
+            backups = BackupSvc.ListBackups(await BackupSvc.GetFolderAsync());
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string FileSize(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "—";
+        }
+
+        var mega = bytes / 1024d / 1024d;
+        return mega >= 1
+            ? mega.ToString("N1", Fa) + " مگابایت"
+            : (bytes / 1024d).ToString("N0", Fa) + " کیلوبایت";
+    }
+}

@@ -149,7 +149,6 @@
             sales.Add(new NavItem("سفارش‌های فروش", "crm/orders", "bi-receipt"));
             sales.Add(new NavItem("کانال‌های فروش", "crm/channels", "bi-shop-window"));
             sales.Add(new NavItem("گزارش سود", "crm/profit", "bi-cash-stack"));
-            sales.Add(new NavItem("سفارش‌های من", "sales", "bi-person-badge"));
         }
 
         var finance = new List<NavItem>();
@@ -182,6 +181,7 @@
         if (canManageSettings)
         {
             admin.Add(new NavItem("تنظیمات", "settings", "bi-sliders"));
+            admin.Add(new NavItem("پشتیبان‌گیری", "backup", "bi-download"));
         }
 
         sections = new List<NavSection>

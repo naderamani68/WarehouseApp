@@ -213,6 +213,26 @@ namespace WarehouseApp.Migrations
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Value = "",
                             ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Backup.Folder",
+                            Group = "پشتیبان‌گیری",
+                            SortOrder = 1,
+                            Title = "پوشهٔ پشتیبان‌گیری (خالی = پوشهٔ backups کنار برنامه)",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "",
+                            ValueType = "text"
+                        },
+                        new
+                        {
+                            Key = "Backup.KeepDays",
+                            Group = "پشتیبان‌گیری",
+                            SortOrder = 2,
+                            Title = "نگهداری پشتیبان (روز)",
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Value = "30",
+                            ValueType = "number"
                         });
                 });
 
