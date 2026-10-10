@@ -1,0 +1,379 @@
+﻿@page "/maintenance"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@using WarehouseApp.Data
+@using WarehouseApp.Services
+@inject ApplicationDbContext Db
+@inject AccessService Access
+@inject AuthService Auth
+@inject BackupService BackupSvc
+@inject ToastService Toasts
+
+@* نگهداری سیستم — پاک‌سازی انتخابی داده‌ها، فقط برای مدیر، همراه با پشتیبان اجباری *@
+
+<PageTitle>نگهداری سیستم | WarehouseApp</PageTitle>
+
+<h3 class="mb-3">🧰 نگهداری سیستم</h3>
+
+<ToastHost Inline="true" />
+
+@if (!allowed)
+{
+    <div class="alert alert-danger">این بخش فقط برای مدیر سیستم است.</div>
+}
+else
+{
+    <div class="alert alert-warning">
+        <div class="fw-bold">پیش از هر کاری این‌ها را بخوان:</div>
+        <ul class="mb-0 mt-2 small">
+            <li>هر بخشی را تیک بزنی، فقط همان بخش پاک می‌شود.</li>
+            <li>اگر بخشی به بخش دیگری وابسته باشد، آن هم خودکار تیک می‌خورد.</li>
+            <li>پیش از پاک‌سازی یک نسخهٔ پشتیبان گرفته می‌شود؛ اگر پشتیبان موفق نشود، پاک‌سازی انجام نمی‌شود.</li>
+            <li>حساب کارمندان، نقش‌ها، کانال‌های فروش و تنظیمات هیچ‌وقت پاک نمی‌شوند.</li>
+            <li>کل پاک‌سازی در یک تراکنش انجام می‌شود؛ اگر خطایی بدهد، هیچ‌چیز پاک نمی‌شود.</li>
+        </ul>
+    </div>
+
+    @if (lastResult is not null)
+    {
+        <div class="alert @(lastResult.Ok ? "alert-success" : "alert-danger")">
+            <div class="fw-bold">@lastResult.Text</div>
+
+            @if (!string.IsNullOrWhiteSpace(lastResult.Backup))
+            {
+                <div class="small mt-1">فایل پشتیبان:</div>
+                <div class="small" dir="ltr">@lastResult.Backup</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(lastResult.Groups))
+            {
+                <div class="small mt-1">بخش‌های پاک‌شده: @lastResult.Groups</div>
+            }
+        </div>
+    }
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">✅ چه چیزی پاک شود؟</h5>
+
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="allGroups"
+                               checked="@allSelected" disabled="@busy"
+                               @onchange="e => ToggleAll(e.Value is bool b && b)" />
+                        <label class="form-check-label small" for="allGroups">همه</label>
+                    </div>
+                </div>
+
+                @foreach (var group in Groups)
+                {
+                    <div class="form-check border-bottom py-2">
+                        <input class="form-check-input" type="checkbox" id="@("g-" + group.Key)"
+                               checked="@IsSelected(group.Key)" disabled="@busy"
+                               @onchange="e => SetGroup(group.Key, e.Value is bool b && b)" />
+
+                        <label class="form-check-label w-100" for="@("g-" + group.Key)">
+                            <span class="fw-semibold">@group.Title</span>
+                            <span class="text-muted small d-block">@group.Note</span>
+                            <span class="small text-muted">ردیف‌های فعلی: @Num(counts.GetValueOrDefault(group.Key))</span>
+                        </label>
+                    </div>
+                }
+
+                @if (autoAdded.Count > 0)
+                {
+                    <div class="alert alert-info small mt-3 mb-0">
+                        این بخش‌ها هم پاک می‌شوند، چون به انتخاب تو وابسته‌اند:
+                        <strong>@string.Join(" و ", autoAdded)</strong>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card p-3 h-100 border-danger">
+                <h5 class="mb-3 text-danger">⚠️ تأیید نهایی</h5>
+
+                <div class="mb-3">
+                    <label class="form-label">رمز عبور مدیر</label>
+                    <input type="password" class="form-control" dir="ltr" data-latin-password="true"
+                           @bind="password" disabled="@busy" autocomplete="current-password" />
+                    <div class="form-text">رمز دوباره پرسیده می‌شود تا کسی اشتباهی داده‌ها را پاک نکند.</div>
+                </div>
+
+                <div class="alert alert-secondary small">
+                    پیش از پاک‌سازی، پشتیبان‌گیری خودکار انجام می‌شود. اگر پشتیبان گرفته نشود، پاک‌سازی متوقف می‌شود.
+                </div>
+
+                <button class="btn btn-danger w-100" @onclick="WipeAsync" disabled="@(busy || !HasSelection)">
+                    @(busy ? "در حال کار..." : "پشتیبان بگیر و پاک کن")
+                </button>
+
+                @if (!HasSelection)
+                {
+                    <div class="form-text text-center mt-2">اول حداقل یک بخش را تیک بزن.</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fa = new("fa-IR");
+
+    /// <summary>یک بخش قابل پاک‌سازی</summary>
+    private record Group(string Key, string Title, string Note, string[] Prerequisites, string[] Tables, string[] ExtraSql);
+
+    /// <summary>نتیجهٔ آخرین پاک‌سازی</summary>
+    private record WipeResult(bool Ok, string Text, string? Backup, string Groups);
+
+    // ترتیب مهم است: هر بخش پیش از بخشی می‌آید که به آن وابسته است
+    private static readonly Group[] Groups =
+    {
+        new("orders", "سفارش‌های فروش", "اقلام سفارش، بعد خود سفارش‌ها",
+            Array.Empty<string>(),
+            new[] { "SalesOrderItems", "SalesOrders" },
+            Array.Empty<string>()),
+
+        new("stock", "حرکات انبار", "همهٔ ورود و خروج‌ها؛ موجودی کالاها صفر می‌شود",
+            Array.Empty<string>(),
+            new[] { "StockMovements" },
+            new[] { "UPDATE [Products] SET [Quantity] = 0" }),
+
+        new("finance", "اسناد مالی", "چک و سفته، بدهی و طلب، هزینه‌ها",
+            Array.Empty<string>(),
+            new[] { "Cheques", "Debts", "Expenses" },
+            Array.Empty<string>()),
+
+        new("crm", "پیگیری و فرصت فروش", "پیگیری‌های مشتریان و فرصت‌های فروش",
+            Array.Empty<string>(),
+            new[] { "CrmInteractions", "CrmOpportunities" },
+            Array.Empty<string>()),
+
+        new("parties", "مشتریان و تأمین‌کنندگان", "پروندهٔ طرف حساب‌ها",
+            new[] { "orders", "finance", "crm" },
+            new[] { "Parties" },
+            Array.Empty<string>()),
+
+        new("products", "کالا، دسته و انبار", "کالاها، عکس‌ها، دسته‌ها و انبارها",
+            new[] { "orders", "stock", "finance" },
+            new[] { "ProductImages", "Products", "Categories", "Warehouses" },
+            new[] { "DELETE FROM [Categories] WHERE [ParentId] IS NOT NULL" }),
+
+        new("logs", "پیامک و تاریخچهٔ عملیات", "پیامک‌های ثبت‌شده و تاریخچهٔ عملیات",
+            Array.Empty<string>(),
+            new[] { "SmsMessages", "AuditLogs" },
+            Array.Empty<string>())
+    };
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private readonly Dictionary<string, bool> selected = new();
+    private readonly Dictionary<string, int> counts = new();
+
+    private bool allowed;
+    private bool busy;
+    private string password = string.Empty;
+    private WipeResult? lastResult;
+
+    private bool HasSelection => Groups.Any(g => IsSelected(g.Key));
+
+    private bool allSelected => Groups.All(g => IsSelected(g.Key));
+
+    private List<string> autoAdded => SelectedKeys()
+        .Where(key => !IsSelected(key))
+        .Select(key => Groups.First(g => g.Key == key).Title)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+
+        allowed = await Access.HasAsync(user, Permissions.MaintainSystem);
+
+        if (allowed)
+        {
+            await LoadCountsAsync();
+        }
+    }
+
+    private bool IsSelected(string key) => selected.TryGetValue(key, out var on) && on;
+
+    private void SetGroup(string key, bool on) => selected[key] = on;
+
+    private void ToggleAll(bool on)
+    {
+        foreach (var group in Groups)
+        {
+            selected[group.Key] = on;
+        }
+    }
+
+    /// <summary>بخش‌های انتخاب‌شده به‌همراه وابستگی‌هایشان</summary>
+    private HashSet<string> SelectedKeys()
+    {
+        var result = new HashSet<string>();
+        var queue = new Queue<string>(Groups.Where(g => IsSelected(g.Key)).Select(g => g.Key));
+
+        while (queue.Count > 0)
+        {
+            var key = queue.Dequeue();
+
+            if (!result.Add(key)) { continue; }
+
+            var group = Groups.FirstOrDefault(g => g.Key == key);
+
+            if (group is null) { continue; }
+
+            foreach (var prerequisite in group.Prerequisites)
+            {
+                queue.Enqueue(prerequisite);
+            }
+        }
+
+        return result;
+    }
+
+    private async Task LoadCountsAsync()
+    {
+        counts["orders"] = await Db.SalesOrderItems.CountAsync();
+        counts["stock"] = await Db.StockMovements.CountAsync();
+        counts["finance"] = await Db.Cheques.CountAsync() + await Db.Debts.CountAsync() + await Db.Expenses.CountAsync();
+        counts["crm"] = await Db.CrmInteractions.CountAsync() + await Db.CrmOpportunities.CountAsync();
+        counts["parties"] = await Db.Parties.CountAsync();
+        counts["products"] = await Db.Products.CountAsync() + await Db.Categories.CountAsync()
+            + await Db.Warehouses.CountAsync() + await Db.ProductImages.CountAsync();
+        counts["logs"] = await Db.SmsMessages.CountAsync() + await Db.AuditLogs.CountAsync();
+    }
+
+    private async Task WipeAsync()
+    {
+        if (!allowed || busy) { return; }
+
+        var chosen = SelectedKeys();
+
+        if (chosen.Count == 0)
+        {
+            Toasts.ShowError("هیچ بخشی انتخاب نشده است");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            Toasts.ShowError("رمز عبور مدیر را وارد کن");
+            return;
+        }
+
+        busy = true;
+        lastResult = null;
+
+        try
+        {
+            var user = AuthState is null ? null : (await AuthState).User;
+            var username = user?.Identity?.Name ?? string.Empty;
+
+            if (AccessService.GetEmployeeId(user) is null)
+            {
+                lastResult = new WipeResult(false, "کاربر شناسایی نشد. دوباره وارد شو.", null, string.Empty);
+                return;
+            }
+
+            // ۱) بررسی رمز عبور مدیر
+            var check = await Auth.ValidateAsync(username, password);
+
+            if (!check.Success)
+            {
+                lastResult = new WipeResult(false, "رمز عبور نادرست است. هیچ‌چیز پاک نشد.", null, string.Empty);
+                Toasts.ShowError("رمز عبور نادرست است");
+                return;
+            }
+
+            // ۲) پشتیبان اجباری
+            var backup = await BackupSvc.RunAsync();
+
+            if (!backup.Success)
+            {
+                lastResult = new WipeResult(false,
+                    "پشتیبان‌گیری انجام نشد، پس پاک‌سازی متوقف شد.", null, string.Empty);
+                Toasts.ShowError("پشتیبان‌گیری ناموفق بود");
+                return;
+            }
+
+            // ۳) پاک‌سازی در یک تراکنش
+            var removed = 0;
+            var doneTitles = new List<string>();
+            var reseedTables = new List<string>();
+
+            await using (var transaction = await Db.Database.BeginTransactionAsync())
+            {
+                foreach (var group in Groups.Where(g => chosen.Contains(g.Key)))
+                {
+                    foreach (var sql in group.ExtraSql)
+                    {
+                        removed += await Db.Database.ExecuteSqlRawAsync(sql);
+                    }
+
+                    foreach (var table in group.Tables)
+                    {
+                        removed += await Db.Database.ExecuteSqlRawAsync($"DELETE FROM [{table}]");
+                        reseedTables.Add(table);
+                    }
+
+                    doneTitles.Add(group.Title);
+                }
+
+                await transaction.CommitAsync();
+            }
+
+            // ۴) شمارندهٔ شناسه‌ها به صفر برمی‌گردد تا دادهٔ تازه از یک شروع شود
+            foreach (var table in reseedTables.Distinct())
+            {
+                try
+                {
+                    await Db.Database.ExecuteSqlRawAsync($"DBCC CHECKIDENT('{table}', RESEED, 0)");
+                }
+                catch
+                {
+                    // بعضی جدول‌ها شمارندهٔ شناسه ندارند — مهم نیست
+                }
+            }
+
+            // ۵) ثبت در تاریخچهٔ عملیات
+            Db.AuditLogs.Add(new AuditLog
+            {
+                Action = "پاک‌سازی داده",
+                Entity = "پایگاه داده",
+                Details = Cut($"پاک‌سازی انجام شد. بخش‌ها: {string.Join("، ", doneTitles)} — ردیف‌های اثرپذیرفته: {removed}"
+                    + $" — پشتیبان: {Path.GetFileName(backup.FilePath)}", 400),
+                Username = username
+            });
+
+            await Db.SaveChangesAsync();
+
+            await LoadCountsAsync();
+            password = string.Empty;
+
+            lastResult = new WipeResult(true,
+                $"پاک‌سازی انجام شد ✅ — {Num(removed)} ردیف اثر پذیرفت.",
+                backup.FilePath,
+                string.Join("، ", doneTitles));
+        }
+        catch (Exception ex)
+        {
+            lastResult = new WipeResult(false, "پاک‌سازی انجام نشد: " + Cut(ex.Message, 300), null, string.Empty);
+            Toasts.ShowError("پاک‌سازی انجام نشد");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string Cut(string? text, int max)
+        => string.IsNullOrEmpty(text) ? string.Empty : (text.Length <= max ? text : text[..max]);
+
+    private static string Num(int value) => value.ToString("N0", Fa);
+}

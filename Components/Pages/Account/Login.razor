@@ -5,9 +5,12 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WarehouseApp.Data
 @attribute [AllowAnonymous]
 @inject WarehouseApp.Services.AuthService Auth
 @inject NavigationManager Nav
+@inject ApplicationDbContext Db
 
 <PageTitle>ورود به سیستم | WarehouseApp</PageTitle>
 
@@ -105,6 +108,29 @@
         if (!result.Success || result.Employee is null)
         {
             errorMessage = result.Error ?? "ورود ناموفق بود";
+
+            // تلاش ناموفق در تاریخچهٔ عملیات ثبت می‌شود — رمز عبور هرگز ذخیره نمی‌شود
+            try
+            {
+                var ip = HttpContext?.Connection.RemoteIpAddress?.ToString();
+                var who = Input.Username.Trim();
+
+                Db.AuditLogs.Add(new AuditLog
+                {
+                    Action = "ورود ناموفق",
+                    Entity = "کارمند",
+                    Details = $"تلاش ناموفق برای ورود با نام کاربری «{who}»"
+                        + (string.IsNullOrWhiteSpace(ip) ? string.Empty : $" از نشانی {ip}"),
+                    Username = who
+                });
+
+                await Db.SaveChangesAsync();
+            }
+            catch
+            {
+                // اگر ثبت تاریخچه خطا داد، جلوی ورود را نمی‌گیریم
+            }
+
             return;
         }
 

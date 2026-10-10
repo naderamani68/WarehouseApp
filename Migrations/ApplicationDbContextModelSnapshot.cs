@@ -843,7 +843,7 @@ namespace WarehouseApp.Migrations
                             IsActive = true,
                             IsSystemRole = true,
                             Name = "مدیر انبار",
-                            Permissions = 33551359
+                            Permissions = 67105791
                         },
                         new
                         {

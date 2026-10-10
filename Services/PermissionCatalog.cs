@@ -34,6 +34,7 @@ public static class PermissionCatalog
         new(Permissions.ManageFinance,     "افزودن و ویرایش سند مالی و هزینه", "مالی و حسابداری"),
         new(Permissions.DeleteFinance,     "حذف سند مالی و هزینه",       "مالی و حسابداری"),
         new(Permissions.ManageSettings,    "مدیریت تنظیمات سیستم",        "مدیریت سیستم"),
+        new(Permissions.MaintainSystem,    "نگهداری سیستم و پاک‌سازی داده", "مدیریت سیستم"),
         new(Permissions.SalesPanel,        "پنل فروشندگان (سفارش‌های خودم)", "فروش و پیگیری (CRM)"),
         new(Permissions.ManageEmployees,   "مدیریت کارمندان",            "مدیریت سیستم"),
         new(Permissions.ManageRoles,       "مدیریت نقش‌ها و دسترسی‌ها",  "مدیریت سیستم")

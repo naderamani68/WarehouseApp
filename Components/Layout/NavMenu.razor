@@ -71,6 +71,7 @@
     private bool canViewCrm;
     private bool canViewFinance;
     private bool canManageSettings;
+    private bool canMaintain;
     private bool canSalesPanel;
 
     private List<NavSection> sections = new();
@@ -102,6 +103,7 @@
         canViewCrm = (permissions & Permissions.ViewCrm) == Permissions.ViewCrm;
         canViewFinance = (permissions & Permissions.ViewFinance) == Permissions.ViewFinance;
         canManageSettings = (permissions & Permissions.ManageSettings) == Permissions.ManageSettings;
+        canMaintain = (permissions & Permissions.MaintainSystem) == Permissions.MaintainSystem;
         canSalesPanel = (permissions & Permissions.SalesPanel) == Permissions.SalesPanel;
 
         BuildSections();
@@ -182,6 +184,11 @@
         {
             admin.Add(new NavItem("تنظیمات", "settings", "bi-sliders"));
             admin.Add(new NavItem("پشتیبان‌گیری", "backup", "bi-download"));
+        }
+
+        if (canMaintain)
+        {
+            admin.Add(new NavItem("نگهداری سیستم", "maintenance", "bi-tools"));
         }
 
         sections = new List<NavSection>
