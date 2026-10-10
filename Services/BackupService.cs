@@ -419,12 +419,27 @@ public class BackupService
             var safeDatabase = Escape(database.Replace("]", "]]"));
             var safeFile = Escape(full);
 
-            db.Database.SetCommandTimeout(900);
+            // دستورهای بازیابی باید از پایگاه دادهٔ master اجرا شوند؛
+            // اگر از خودِ پایگاه داده اجرا شوند، همین اتصال مانع بازیابی می‌شود
+            var builder = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(db.Database.GetConnectionString())
+            {
+                InitialCatalog = "master",
+                Pooling = false
+            };
+
+            await using var connection = new Microsoft.Data.SqlClient.SqlConnection(builder.ConnectionString);
+            await connection.OpenAsync();
 
             // ۲) بررسی سلامت فایل پشتیبان پیش از هر تغییری
             try
             {
-                await db.Database.ExecuteSqlRawAsync($"RESTORE VERIFYONLY FROM DISK = N'{safeFile}'");
+                await using var verify = new Microsoft.Data.SqlClient.SqlCommand(
+                    $"RESTORE VERIFYONLY FROM DISK = N'{safeFile}'", connection)
+                {
+                    CommandTimeout = 900
+                };
+
+                await verify.ExecuteNonQueryAsync();
             }
             catch (Exception ex)
             {
@@ -449,7 +464,13 @@ BEGIN CATCH
     THROW;
 END CATCH";
 
-            await db.Database.ExecuteSqlRawAsync(sql);
+            await using (var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection)
+            {
+                CommandTimeout = 900
+            })
+            {
+                await command.ExecuteNonQueryAsync();
+            }
 
             // اتصال‌های سوخته از استخر کنار گذاشته می‌شوند
             Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
