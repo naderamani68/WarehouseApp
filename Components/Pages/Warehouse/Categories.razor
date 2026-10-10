@@ -27,6 +27,21 @@
                 </div>
 
                 <div class="mb-3">
+                    <label class="form-label">دستهٔ مادر:</label>
+                    <select class="form-select" @bind="newParentId">
+                        <option value="0">— بدون مادر (دستهٔ اصلی) —</option>
+
+                        @foreach (var option in ParentOptions)
+                        {
+                            <option value="@option.Id">@option.Label</option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-1">
+                        اگر دستهٔ مادر انتخاب کنی، این دسته زیردستهٔ آن می‌شود و در فروشگاه زیر همان دسته دیده می‌شود.
+                    </div>
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label">توضیحات:</label>
                     <textarea class="form-control" rows="3" @bind="newDescription"
                               placeholder="توضیحات اختیاری..."></textarea>
@@ -149,6 +164,8 @@
         public string Name { get; set; } = "";
         public string? Description { get; set; }
         public int ProductCount { get; set; }
+        public int? ParentId { get; set; }
+        public string? ParentName { get; set; }
     }
 
     // ===== حالت‌های صفحه =====
@@ -157,6 +174,7 @@
 
     private string? newName;
     private string? newDescription;
+    private int newParentId;
 
     private string? searchTerm;
     private bool loading = true;
@@ -182,13 +200,16 @@
     {
         loading = true;
         categories = await Db.Categories
+            .Include(c => c.Parent)
             .OrderBy(c => c.Name)
             .Select(c => new CategoryListItem
                 {
                     Id = c.Id,
                     Name = c.Name,
                     Description = c.Description,
-                    ProductCount = c.Products.Count
+                    ProductCount = c.Products.Count,
+                    ParentId = c.ParentId,
+                    ParentName = c.Parent != null ? c.Parent.Name : null
                 })
             .ToListAsync();
         loading = false;
@@ -214,7 +235,8 @@
             var cat = new Category
                 {
                     Name = newName.Trim(),
-                    Description = string.IsNullOrWhiteSpace(newDescription) ? null : newDescription.Trim()
+                    Description = string.IsNullOrWhiteSpace(newDescription) ? null : newDescription.Trim(),
+                    ParentId = newParentId > 0 ? newParentId : null
                 };
 
             Db.Categories.Add(cat);
@@ -242,6 +264,7 @@
             };
         newName = item.Name;
         newDescription = item.Description;
+        newParentId = item.ParentId ?? 0;
     }
 
     // ===== ذخیره‌ی ویرایش =====
@@ -254,6 +277,12 @@
         }
 
         if (editingCategory == null) return;
+
+        if (IsOwnBranch(newParentId))
+        {
+            Toasts.ShowError("این دسته نمی‌تواند زیردستهٔ خودش یا زیردسته‌هایش شود.");
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(newName))
         {
@@ -272,6 +301,7 @@
 
             entity.Name = newName.Trim();
             entity.Description = string.IsNullOrWhiteSpace(newDescription) ? null : newDescription.Trim();
+            entity.ParentId = newParentId > 0 ? newParentId : null;
 
             await Db.SaveChangesAsync();
             await LoadCategories();
@@ -334,6 +364,53 @@
     {
         newName = string.Empty;
         newDescription = string.Empty;
+        newParentId = 0;
+    }
+
+    /// <summary>آیا دستهٔ انتخابی، خودِ این دسته یا یکی از زیردسته‌هایش است؟</summary>
+    private bool IsOwnBranch(int parentId)
+    {
+        if (parentId <= 0 || editingCategory is null) { return false; }
+
+        var current = parentId;
+
+        for (var step = 0; step < 20; step++)
+        {
+            if (current == editingCategory.Id) { return true; }
+
+            var node = categories.FirstOrDefault(c => c.Id == current);
+
+            if (node?.ParentId is null or 0) { return false; }
+
+            current = node.ParentId.Value;
+        }
+
+        return false;
+    }
+
+    /// <summary>گزینه‌های دستهٔ مادر — تورفته و بدون خودِ دسته</summary>
+    private List<(int Id, string Label)> ParentOptions
+    {
+        get
+        {
+            var result = new List<(int, string)>();
+
+            Add(null, 0);
+
+            return result;
+
+            void Add(int? parentId, int depth)
+            {
+                foreach (var item in categories.Where(c => c.ParentId == parentId).OrderBy(c => c.Name))
+                {
+                    if (editingCategory is not null && item.Id == editingCategory.Id) { continue; }
+
+                    result.Add((item.Id, string.Concat(Enumerable.Repeat("— ", depth)) + item.Name));
+
+                    Add(item.Id, depth + 1);
+                }
+            }
+        }
     }
 
     // ===== 🆕 خروجی Excel =====

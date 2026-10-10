@@ -8,125 +8,375 @@
 @* این صفحه عمداً بدون حالت تعاملی رندر می‌شود:
    بازدیدکنندهٔ ناشناس یک اتصال زندهٔ سروری اشغال نمی‌کند و موتور جستجو هم صفحه را می‌بیند. *@
 
-<PageTitle>فروشگاه</PageTitle>
+<PageTitle>@(selected is null ? "فروشگاه" : selected.Name + " — فروشگاه")</PageTitle>
 
 <HeadContent>
     <meta name="description" content="فهرست کالاهای موجود همراه با قیمت و موجودی — ثبت سفارش اینترنتی بدون نیاز به ثبت‌نام" />
 </HeadContent>
 
 <div class="container py-4">
+    <div class="row g-4">
 
-    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
-        <div>
-            <h1 class="mb-1">کالاهای موجود</h1>
-            <p class="text-muted mb-0 small">
-                قیمت‌ها به ریال است — ثبت سفارش بدون نیاز به ثبت‌نام انجام می‌شود.
-            </p>
+        @* ===== نوار کناری: درخت دسته‌بندی ===== *@
+        <div class="col-lg-3">
+            <aside class="shop-side">
+                <div class="shop-side-title">
+                    <span class="bi bi-diagram-3" aria-hidden="true"></span>
+                    دسته‌بندی کالاها
+                </div>
+
+                <a href="/shop" class="shop-tree-link @(selected is null && string.IsNullOrWhiteSpace(search) ? "active" : "")">
+                    <span>همهٔ کالاها</span>
+                    <span class="shop-tree-count">@Num(AllCount)</span>
+                </a>
+
+                @foreach (var node in tree)
+                {
+                    @TreeNode(node, 0)
+                }
+
+                @if (tree.Count == 0)
+                {
+                    <div class="text-muted small p-2">هنوز دسته‌ای ثبت نشده است.</div>
+                }
+            </aside>
         </div>
-        <span class="shop-chip">@products.Count.ToString("N0", Fa) کالا</span>
-    </div>
 
-    @if (categories.Count > 0)
-    {
-        <div class="d-flex flex-wrap gap-2 mb-3">
-            <a href="/shop" class="shop-chip text-decoration-none">همه</a>
+        @* ===== بخش اصلی ===== *@
+        <div class="col-lg-9">
 
-            @foreach (var category in categories)
+            @if (!string.IsNullOrWhiteSpace(search))
             {
-                <a href="/shop?cat=@category.Id" class="shop-chip text-decoration-none">@category.Name</a>
+                <div class="shop-crumb">
+                    <a href="/shop">همهٔ کالاها</a>
+                    <span>/</span>
+                    <span>جستجو</span>
+                </div>
+
+                <h1 class="h5 mb-1">نتیجهٔ جستجو برای «@search»</h1>
+                <p class="text-muted small mb-3">
+                    @Num(products.Count) کالا پیدا شد — <a href="/shop">نمایش همهٔ کالاها</a>
+                </p>
             }
-        </div>
-    }
-
-    @if (products.Count == 0)
-    {
-        <div class="alert alert-info mb-0">
-            کالایی با این مشخصات پیدا نشد.
-            <a href="/shop" class="ms-2">نمایش همهٔ کالاها</a>
-        </div>
-    }
-    else
-    {
-        <div class="shop-grid">
-            @foreach (var product in products)
+            else if (selected is not null)
             {
-                <div class="shop-card">
-                    <a href="/shop/product/@product.Id" class="text-decoration-none">
-                        <div class="shop-card-img">
-                            @if (!string.IsNullOrWhiteSpace(product.MainImage))
-                            {
-                                <img src="/@product.MainImage" alt="@product.Name"
-                                     style="width:100%;height:140px;object-fit:cover" />
-                            }
-                            else
-                            {
-                                <span class="bi bi-box-seam" aria-hidden="true"></span>
-                            }
-                        </div>
-                    </a>
+                <nav class="shop-crumb">
+                    <a href="/shop">همهٔ کالاها</a>
 
-                    <div class="shop-card-body">
-                        <a href="/shop/product/@product.Id" class="text-decoration-none text-reset fw-semibold">
-                            @product.Name
-                        </a>
+                    @foreach (var crumb in trail)
+                    {
+                        <span>/</span>
+                        <a href="/shop?cat=@crumb.Id">@crumb.Name</a>
+                    }
+                </nav>
 
-                        @if (!string.IsNullOrWhiteSpace(product.CategoryName))
+                <h1 class="h4 mb-1">@selected.Name</h1>
+                <p class="text-muted small mb-3">@Num(selected.TotalCount) کالا در این دسته</p>
+
+                @if (selected.Children.Count > 0)
+                {
+                    <div class="shop-subcats">
+                        @foreach (var child in selected.Children)
                         {
-                            <div class="text-muted small">@product.CategoryName</div>
-                        }
-
-                        <div class="small text-muted">واحد: @product.UnitTitle</div>
-
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="shop-price">@(product.Price > 0 ? Money(product.Price) + " ریال" : "تماس بگیرید")</span>
-
-                            @if (product.InStock)
-                            {
-                                <span class="badge bg-success">موجود</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-secondary">ناموجود</span>
-                            }
-                        </div>
-
-                        @if (product.InStock)
-                        {
-                            <form method="post" action="/shop/cart/add" class="mt-auto">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="productId" value="@product.Id" />
-                                <input type="hidden" name="quantity" value="1" />
-                                <input type="hidden" name="returnUrl" value="/shop" />
-                                <button class="btn btn-primary btn-sm w-100" type="submit">
-                                    <span class="bi bi-cart-plus me-1" aria-hidden="true"></span>
-                                    افزودن به سبد
-                                </button>
-                            </form>
+                            <a class="shop-subcat" href="/shop?cat=@child.Id">
+                                <span>@child.Name</span>
+                                <span class="shop-subcat-count">@Num(child.TotalCount)</span>
+                            </a>
                         }
                     </div>
+                }
+            }
+            else
+            {
+                <h1 class="h4 mb-1">فروشگاه</h1>
+                <p class="text-muted small mb-3">
+                    قیمت‌ها به ریال است — ثبت سفارش بدون نیاز به ثبت‌نام انجام می‌شود.
+                </p>
+
+                @if (tree.Count > 0)
+                {
+                    <div class="shop-cat-cards mb-4">
+                        @foreach (var node in tree)
+                        {
+                            <a class="shop-cat-card" href="/shop?cat=@node.Id">
+                                <span class="shop-cat-card-icon">@Icon(node.Name)</span>
+                                <span class="shop-cat-card-name">@node.Name</span>
+                                <span class="text-muted small">@Num(node.TotalCount) کالا</span>
+                            </a>
+                        }
+                    </div>
+                }
+            }
+
+            @* ===== کالاها ===== *@
+            @if (products.Count == 0)
+            {
+                <div class="alert alert-info mb-0">
+                    کالایی با این مشخصات پیدا نشد.
+                    <a href="/shop" class="ms-2">نمایش همهٔ کالاها</a>
                 </div>
             }
-        </div>
-    }
+            else if (showGroups && groups.Count > 0)
+            {
+                @foreach (var group in groups)
+                {
+                    <section class="shop-group">
+                        <div class="shop-group-title">
+                            <span>@Icon(group.Name) @group.Name</span>
 
+                            @if (group.CategoryId is not null)
+                            {
+                                <a href="/shop?cat=@group.CategoryId">مشاهدهٔ دسته</a>
+                            }
+                        </div>
+
+                        <div class="shop-grid">
+                            @foreach (var product in group.Items)
+                            {
+                                @Card(product)
+                            }
+                        </div>
+                    </section>
+                }
+            }
+            else
+            {
+                <div class="shop-grid">
+                    @foreach (var product in products)
+                    {
+                        @Card(product)
+                    }
+                </div>
+            }
+
+        </div>
+    </div>
 </div>
 
 @code {
     private static readonly CultureInfo Fa = new("fa-IR");
 
     private List<ShopProductDto> products = new();
-    private List<ShopCategoryDto> categories = new();
+    private List<ShopCategoryNode> tree = new();
+    private List<ShopCategoryNode> trail = new();
+    private List<(string Name, int? CategoryId, List<ShopProductDto> Items)> groups = new();
+    private ShopCategoryNode? selected;
+    private string? search;
+
+    /// <summary>مجموع کالاهای همهٔ دسته‌های اصلی</summary>
+    private int AllCount => tree.Sum(n => n.TotalCount);
+
+    /// <summary>در حالت عادی، کالاها دسته‌دسته نشان داده می‌شوند</summary>
+    private bool showGroups => selected is null && string.IsNullOrWhiteSpace(search);
+
+    private string CurrentUrl => selected is not null
+        ? $"/shop?cat={selected.Id}"
+        : string.IsNullOrWhiteSpace(search) ? "/shop" : $"/shop?q={Uri.EscapeDataString(search)}";
 
     protected override async Task OnInitializedAsync()
     {
         var query = Http.HttpContext?.Request.Query;
 
-        var search = query?["q"].FirstOrDefault();
+        search = query?["q"].FirstOrDefault();
         var categoryId = int.TryParse(query?["cat"].FirstOrDefault(), out var parsed) ? parsed : (int?)null;
 
-        categories = await Catalog.GetCategoriesAsync();
+        tree = await Catalog.GetCategoryTreeAsync();
+
+        selected = categoryId is > 0 ? FindNode(tree, categoryId.Value) : null;
+
+        // دستهٔ ناموجود یا غیرفعال، مثل «همهٔ کالاها» رفتار می‌کند
+        if (selected is null)
+        {
+            categoryId = null;
+        }
+
         products = await Catalog.GetProductsAsync(search, categoryId);
+
+        if (selected is not null)
+        {
+            trail = BuildTrail(selected.Id);
+        }
+        else if (showGroups)
+        {
+            groups = BuildGroups(products);
+        }
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".");
+    // ===== درخت کناری =====
+    private RenderFragment TreeNode(ShopCategoryNode node, int depth) => @<text>
+        @if (node.Children.Count == 0)
+        {
+            <a class="shop-tree-link @(selected?.Id == node.Id ? "active" : "")"
+               style="padding-right:@(10 + depth * 14)px" href="/shop?cat=@node.Id">
+                <span>@node.Name</span>
+                <span class="shop-tree-count">@Num(node.ProductCount)</span>
+            </a>
+        }
+        else
+        {
+            <details class="shop-tree-group" open="@(trail.Any(t => t.Id == node.Id) || selected?.Id == node.Id ? "open" : null)">
+                <summary class="shop-tree-link @(selected?.Id == node.Id ? "active" : "")"
+                         style="padding-right:@(10 + depth * 14)px">
+                    <span>@node.Name</span>
+                    <span class="shop-tree-count">@Num(node.TotalCount)</span>
+                </summary>
+
+                <div class="shop-tree-children">
+                    <a class="shop-tree-link @(selected?.Id == node.Id ? "active" : "")" href="/shop?cat=@node.Id">
+                        <span>همهٔ @node.Name</span>
+                        <span class="shop-tree-count">@Num(node.ProductCount)</span>
+                    </a>
+
+                    @foreach (var child in node.Children)
+                    {
+                        @TreeNode(child, depth + 1)
+                    }
+                </div>
+            </details>
+        }
+    </text>;
+
+    // ===== کارت کالا =====
+    private RenderFragment Card(ShopProductDto product) => @<div class="shop-card">
+        <a href="/shop/product/@product.Id" class="text-decoration-none">
+            <div class="shop-card-img">
+                @if (!string.IsNullOrWhiteSpace(product.MainImage))
+                {
+                    <img src="/@product.MainImage" alt="@product.Name"
+                         style="width:100%;height:140px;object-fit:cover" />
+                }
+                else
+                {
+                    <span class="bi bi-box-seam" aria-hidden="true"></span>
+                }
+            </div>
+        </a>
+
+        <div class="shop-card-body">
+            <a href="/shop/product/@product.Id" class="text-decoration-none text-reset fw-semibold">
+                @product.Name
+            </a>
+
+            @if (!string.IsNullOrWhiteSpace(product.CategoryName))
+            {
+                <div class="text-muted small">@product.CategoryName</div>
+            }
+
+            <div class="small text-muted">واحد: @product.UnitTitle</div>
+
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="shop-price">@(product.Price > 0 ? Money(product.Price) : "تماس بگیرید")</span>
+
+                @if (product.InStock)
+                {
+                    <span class="badge bg-success">موجود</span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary">ناموجود</span>
+                }
+            </div>
+
+            @if (product.InStock)
+            {
+                <form method="post" action="/shop/cart/add" class="mt-auto">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="productId" value="@product.Id" />
+                    <input type="hidden" name="quantity" value="1" />
+                    <input type="hidden" name="returnUrl" value="@CurrentUrl" />
+                    <button class="btn btn-primary btn-sm w-100" type="submit">
+                        <span class="bi bi-cart-plus me-1" aria-hidden="true"></span>
+                        افزودن به سبد
+                    </button>
+                </form>
+            }
+        </div>
+    </div>;
+
+    // ===== ابزارها =====
+    private static ShopCategoryNode? FindNode(List<ShopCategoryNode> nodes, int id)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Id == id) { return node; }
+
+            var found = FindNode(node.Children, id);
+
+            if (found is not null) { return found; }
+        }
+
+        return null;
+    }
+
+    private List<ShopCategoryNode> BuildTrail(int id)
+    {
+        var path = new List<ShopCategoryNode>();
+
+        return Walk(tree, id, path) ? path : new List<ShopCategoryNode>();
+
+        static bool Walk(List<ShopCategoryNode> nodes, int target, List<ShopCategoryNode> path)
+        {
+            foreach (var node in nodes)
+            {
+                path.Add(node);
+
+                if (node.Id == target) { return true; }
+
+                if (Walk(node.Children, target, path)) { return true; }
+
+                path.RemoveAt(path.Count - 1);
+            }
+
+            return false;
+        }
+    }
+
+    private List<(string Name, int? CategoryId, List<ShopProductDto> Items)> BuildGroups(List<ShopProductDto> items)
+    {
+        var byName = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        Collect(tree);
+
+        var result = new List<(string, int?, List<ShopProductDto>)>();
+
+        foreach (var group in items.GroupBy(p => string.IsNullOrWhiteSpace(p.CategoryName) ? "بدون دسته" : p.CategoryName!))
+        {
+            result.Add((group.Key, byName.TryGetValue(group.Key, out var found) ? found : null, group.ToList()));
+        }
+
+        return result;
+
+        void Collect(List<ShopCategoryNode> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                if (!byName.ContainsKey(node.Name)) { byName[node.Name] = node.Id; }
+
+                Collect(node.Children);
+            }
+        }
+    }
+
+    /// <summary>نماد دسته بر پایهٔ نامش</summary>
+    private static string Icon(string name)
+    {
+        if (name.Contains("کامپیوتر") || name.Contains("رایانه")) { return "🖥️"; }
+        if (name.Contains("موبایل") || name.Contains("گوشی")) { return "📱"; }
+        if (name.Contains("برق") || name.Contains("الکتر")) { return "🔌"; }
+        if (name.Contains("صوتی") || name.Contains("تصویری")) { return "🔊"; }
+        if (name.Contains("لوازم")) { return "🧰"; }
+        if (name.Contains("ابزار")) { return "🛠️"; }
+        if (name.Contains("خوراک") || name.Contains("غذا")) { return "🍽️"; }
+        if (name.Contains("پوشاک") || name.Contains("لباس")) { return "👕"; }
+        if (name.Contains("بهداشت") || name.Contains("آرایش")) { return "🧴"; }
+        if (name.Contains("خودرو")) { return "🚗"; }
+        if (name.Contains("ساختمان") || name.Contains("مصالح")) { return "🧱"; }
+        if (name.Contains("نوشت") || name.Contains("اداری")) { return "✏️"; }
+
+        return "🏷️";
+    }
+
+    private static string Num(int value) => value.ToString("N0", Fa);
+
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 }

@@ -1329,3 +1329,188 @@ a.user-box:hover {
     color: #fff;
     background: var(--accent, #4f46e5);
 }
+/* ===== فروشگاه: نوار کناری درخت دسته‌ها ===== */
+.shop-side {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 14px;
+    padding: 0.75rem;
+    position: sticky;
+    top: 1rem;
+}
+
+.shop-side-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    margin-bottom: 0.5rem;
+}
+
+.shop-tree-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.42rem 0.6rem;
+    border-radius: 9px;
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.92rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+    .shop-tree-link:hover {
+        background: rgba(99, 102, 241, 0.08);
+    }
+
+    .shop-tree-link.active {
+        background: rgba(99, 102, 241, 0.14);
+        font-weight: 700;
+    }
+
+.shop-tree-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.shop-tree-group > summary::after {
+    content: "\F282";
+    font-family: "bootstrap-icons";
+    font-size: 0.75rem;
+    opacity: 0.5;
+}
+
+.shop-tree-group[open] > summary::after {
+    content: "\F286";
+}
+
+.shop-tree-children {
+    margin-right: 0.9rem;
+    border-right: 1px dashed var(--border-color, #e5e7eb);
+    padding-right: 0.4rem;
+}
+
+.shop-tree-count {
+    font-size: 0.72rem;
+    background: rgba(99, 102, 241, 0.12);
+    border-radius: 20px;
+    padding: 0.1rem 0.5rem;
+    min-width: 1.6rem;
+    text-align: center;
+}
+
+/* ===== فروشگاه: کارت دسته و زیردسته ===== */
+.shop-cat-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.75rem;
+}
+
+.shop-cat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(99, 102, 241, 0.02));
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.18s, box-shadow 0.18s;
+}
+
+    .shop-cat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+    }
+
+.shop-cat-card-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+.shop-cat-card-name {
+    font-weight: 700;
+}
+
+.shop-subcats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.shop-subcat {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    background: var(--card-bg, #fff);
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+    .shop-subcat:hover {
+        border-color: #6366f1;
+    }
+
+.shop-subcat-count {
+    font-size: 0.72rem;
+    opacity: 0.65;
+}
+
+.shop-crumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-muted, #6b7280);
+    margin-bottom: 0.5rem;
+}
+
+    .shop-crumb a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+        .shop-crumb a:hover {
+            color: #6366f1;
+        }
+
+.shop-group {
+    margin-bottom: 1.75rem;
+}
+
+.shop-group-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1.02rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.85rem;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.18);
+}
+
+    .shop-group-title a {
+        font-weight: 400;
+        font-size: 0.82rem;
+        color: inherit;
+        opacity: 0.7;
+        text-decoration: none;
+    }
+
+@media (max-width: 991px) {
+    .shop-side {
+        position: static;
+        margin-bottom: 1rem;
+    }
+}

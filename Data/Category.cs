@@ -17,6 +17,15 @@ namespace WarehouseApp.Data
 
         public bool IsActive { get; set; } = true;
 
+        /// <summary>دستهٔ مادر — خالی یعنی این دسته، دستهٔ اصلی است</summary>
+        [Display(Name = "دستهٔ مادر")]
+        public int? ParentId { get; set; }
+
+        public Category? Parent { get; set; }
+
+        /// <summary>زیردسته‌ها</summary>
+        public ICollection<Category> Children { get; set; } = new List<Category>();
+
         // ارتباط یک-به-چند با Product
         public ICollection<Product> Products { get; set; } = new List<Product>();
     }

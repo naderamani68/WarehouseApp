@@ -39,7 +39,9 @@ public class ShopCatalogService
 
         if (categoryId is > 0)
         {
-            query = query.Where(p => p.CategoryId == categoryId);
+            // کالاهای زیردسته‌ها هم نمایش داده می‌شوند
+            var ids = await DescendantIdsAsync(db, categoryId.Value);
+            query = query.Where(p => p.CategoryId != null && ids.Contains(p.CategoryId.Value));
         }
 
         // نکته: ترتیبدهی باید روی ستون‌های واقعی جدول انجام شود، نه روی ویژگی‌های
@@ -116,6 +118,101 @@ public class ShopCatalogService
             .OrderBy(c => c.Name)
             .Select(c => new ShopCategoryDto(c.Id, c.Name ?? "بی‌نام"))
             .ToListAsync();
+    }
+
+    /// <summary>درخت دسته‌ها با شمارش کالا — برای نوار کناری فروشگاه</summary>
+    public async Task<List<ShopCategoryNode>> GetCategoryTreeAsync()
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+
+        var rows = await db.Categories
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .Select(c => new
+            {
+                c.Id,
+                Name = c.Name ?? "بی‌نام",
+                c.ParentId,
+                Count = c.Products.Count(p => p.IsActive && p.ShowInShop)
+            })
+            .ToListAsync();
+
+        // شمارش هر دسته به‌همراه همهٔ زیردسته‌هایش
+        var totals = rows.ToDictionary(r => r.Id, r => r.Count);
+
+        foreach (var row in rows.Where(r => r.ParentId is not null))
+        {
+            var parentId = row.ParentId!.Value;
+
+            for (var step = 0; step < 20 && totals.ContainsKey(parentId); step++)
+            {
+                totals[parentId] += row.Count;
+                parentId = rows.FirstOrDefault(r => r.Id == parentId)?.ParentId ?? 0;
+            }
+        }
+
+        var nodes = rows.ToDictionary(
+            r => r.Id,
+            r => new ShopCategoryNode(r.Id, r.Name, r.ParentId, r.Count)
+            {
+                TotalCount = totals[r.Id]
+            });
+
+        var roots = new List<ShopCategoryNode>();
+
+        foreach (var node in nodes.Values)
+        {
+            if (node.ParentId is not null && nodes.TryGetValue(node.ParentId.Value, out var parent))
+            {
+                parent.Children.Add(node);
+            }
+            else
+            {
+                roots.Add(node);
+            }
+        }
+
+        Sort(roots);
+        return roots;
+
+        static void Sort(List<ShopCategoryNode> list)
+        {
+            list.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCulture));
+
+            foreach (var node in list)
+            {
+                Sort(node.Children);
+            }
+        }
+    }
+
+    /// <summary>شناسهٔ یک دسته و همهٔ زیردسته‌هایش</summary>
+    private static async Task<List<int>> DescendantIdsAsync(ApplicationDbContext db, int rootId)
+    {
+        var pairs = await db.Categories
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .Select(c => new { c.Id, c.ParentId })
+            .ToListAsync();
+
+        var result = new List<int> { rootId };
+        var frontier = new List<int> { rootId };
+
+        for (var depth = 0; depth < 10 && frontier.Count > 0; depth++)
+        {
+            var parents = frontier;
+
+            frontier = pairs
+                .Where(p => p.ParentId is not null && parents.Contains(p.ParentId.Value))
+                .Select(p => p.Id)
+                .Where(id => !result.Contains(id))
+                .Distinct()
+                .ToList();
+
+            result.AddRange(frontier);
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -277,6 +374,15 @@ public record ShopProductDto(
 
 /// <summary>مدل سبک دستهٔ کالا برای فروشگاه</summary>
 public record ShopCategoryDto(int Id, string Name);
+
+/// <summary>گرهٔ درخت دسته در فروشگاه — دستهٔ مادر با زیردسته‌هایش</summary>
+public record ShopCategoryNode(int Id, string Name, int? ParentId, int ProductCount)
+{
+    /// <summary>شمارش کالاهای این دسته به‌همراه زیردسته‌ها</summary>
+    public int TotalCount { get; init; }
+
+    public List<ShopCategoryNode> Children { get; } = new();
+}
 
 /// <summary>وضعیت سفارش برای پیگیری مشتری</summary>
 public record ShopOrderDto(

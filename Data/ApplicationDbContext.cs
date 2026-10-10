@@ -170,6 +170,13 @@ namespace WarehouseApp.Data
             modelBuilder.Entity<Expense>()
                 .HasIndex(e => e.At);
 
+            // دسته‌بندی درختی: هر دسته می‌تواند زیردستهٔ یک دستهٔ دیگر باشد
+            modelBuilder.Entity<Category>()
+                .HasOne(c => c.Parent)
+                .WithMany(c => c.Children)
+                .HasForeignKey(c => c.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ===== تنظیمات پیش‌فرض =====
             // این مقدارها در پایگاه داده ذخیره می‌شوند و از صفحهٔ «تنظیمات» قابل ویرایش‌اند
             var seedDate = new DateTime(2026, 1, 1);

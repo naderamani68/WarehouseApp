@@ -289,7 +289,12 @@ namespace WarehouseApp.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
 
                     b.ToTable("Categories");
                 });
@@ -1137,6 +1142,16 @@ namespace WarehouseApp.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("WarehouseApp.Data.Category", b =>
+                {
+                    b.HasOne("WarehouseApp.Data.Category", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("WarehouseApp.Data.Cheque", b =>
                 {
                     b.HasOne("WarehouseApp.Data.Party", "Party")
@@ -1291,6 +1306,8 @@ namespace WarehouseApp.Migrations
 
             modelBuilder.Entity("WarehouseApp.Data.Category", b =>
                 {
+                    b.Navigation("Children");
+
                     b.Navigation("Products");
                 });
 
