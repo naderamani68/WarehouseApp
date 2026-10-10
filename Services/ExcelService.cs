@@ -64,6 +64,8 @@ public class ExcelService
         row++;
 
         // ===== داده‌ها =====
+        var numericColumns = new HashSet<int>();
+
         foreach (var item in dataList)
         {
             col = 1;
@@ -72,14 +74,26 @@ public class ExcelService
                 var val = c.Value(item);
                 var cell = ws.Cell(row, col);
 
-                cell.Value = val switch
+                var text = val switch
                 {
                     null => string.Empty,
                     DateTime dt => usePersianDate
                         ? FormatPersianDate(dt)
                         : dt.ToString("yyyy/MM/dd HH:mm"),
-                    _ => val.ToString()
+                    _ => val.ToString() ?? string.Empty
                 };
+
+                // عددها به‌صورت عدد واقعی نوشته می‌شوند تا در اکسل قابل جمع زدن باشند
+                if (TryNumber(text, out var number))
+                {
+                    cell.Value = number;
+                    cell.Style.NumberFormat.Format = "#,##0";
+                    numericColumns.Add(col);
+                }
+                else
+                {
+                    cell.Value = text;
+                }
 
                 cell.Style.Font.FontName = PersianFont;
                 cell.Style.Font.FontSize = 10;
@@ -143,6 +157,39 @@ public class ExcelService
             ws.Range(headerRow, 1, row - 1, columns.Count).SetAutoFilter();
         }
 
+        // ===== ردیف جمع کل =====
+        if (numericColumns.Count > 0 && dataList.Count > 1)
+        {
+            int totalRow = row;
+            int labelCol = Enumerable.Range(1, columns.Count).FirstOrDefault(i => !numericColumns.Contains(i));
+
+            for (int i = 1; i <= columns.Count; i++)
+            {
+                var cell = ws.Cell(totalRow, i);
+                cell.Style.Font.FontName = PersianFont;
+                cell.Style.Font.FontSize = 10;
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
+                cell.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+                if (i == labelCol)
+                {
+                    cell.Value = "جمع کل";
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
+                else if (numericColumns.Contains(i))
+                {
+                    var letter = ws.Column(i).ColumnLetter();
+                    cell.FormulaA1 = $"SUM({letter}{headerRow + 1}:{letter}{row - 1})";
+                    cell.Style.NumberFormat.Format = "#,##0";
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
+            }
+
+            ws.Row(totalRow).Height = 22;
+        }
+
         // ===== راست‌چین کردن کل شیت =====
         ws.RightToLeft = true;
 
@@ -152,6 +199,56 @@ public class ExcelService
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();
+    }
+
+    /// <summary>
+    /// تشخیص متن عددی: مبلغ با جداکنندهٔ هزار (۱٬۲۳۴ یا 1,234) یا عدد صحیح کوتاه.
+    /// شمارهٔ موبایل و کد ملی عمداً عدد نمی‌شوند تا صفر اولشان از دست نرود.
+    /// </summary>
+    private static bool TryNumber(string text, out decimal value)
+    {
+        value = 0m;
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var clean = NormalizeDigits(text.Trim());
+
+        // مبلغ با جداکنندهٔ هزار
+        if (System.Text.RegularExpressions.Regex.IsMatch(clean, @"^-?\d{1,3}(,\d{3})+$"))
+        {
+            return decimal.TryParse(clean.Replace(",", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+        }
+
+        // عدد صحیح کوتاه (تعداد، سال) — بدون صفر ابتدایی و بیشتر از ۹ رقم نباشد
+        if (System.Text.RegularExpressions.Regex.IsMatch(clean, @"^-?[1-9]\d{0,8}$"))
+        {
+            return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+        }
+
+        return false;
+    }
+
+    /// <summary>تبدیل رقم‌های فارسی و عربی به رقم لاتین</summary>
+    private static string NormalizeDigits(string text)
+    {
+        var builder = new System.Text.StringBuilder(text.Length);
+
+        foreach (var ch in text)
+        {
+            builder.Append(ch switch
+            {
+                >= '\u06F0' and <= '\u06F9' => (char)(ch - '\u06F0' + '0'),
+                >= '\u0660' and <= '\u0669' => (char)(ch - '\u0660' + '0'),
+                '\u066B' => '.',
+                '\u066C' => ',',
+                _ => ch
+            });
+        }
+
+        return builder.ToString();
     }
 
     private static string FormatPersianDate(DateTime dt)
