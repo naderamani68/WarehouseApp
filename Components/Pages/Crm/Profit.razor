@@ -289,7 +289,15 @@ else
     private static decimal Amount(SalesOrderItem item) => (decimal)item.Quantity;
 
     /// <summary>بهای تمام‌شدهٔ یک قلم = تعداد × بهای خرید ثبت‌شدهٔ کالا</summary>
-    private static decimal CostOf(SalesOrderItem item) => (decimal)item.Quantity * (item.Product?.CostPrice ?? 0m);
+    /// <summary>
+    /// بهای تمام‌شدهٔ یک قلم — از عکسِ ثبت‌شده در لحظهٔ فروش خوانده می‌شود.
+    /// برای سفارش‌های قدیمی که عکس ندارند، از قیمت خرید فعلی کالا استفاده می‌شود.
+    /// </summary>
+    private static decimal CostOf(SalesOrderItem item)
+    {
+        var unit = item.CostPrice > 0 ? item.CostPrice : item.Product?.CostPrice ?? 0m;
+        return (decimal)item.Quantity * unit;
+    }
 
     private async Task SetRangeAsync(int days)
     {

@@ -1026,6 +1026,9 @@ namespace WarehouseApp.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal>("CostPrice")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("DiscountPercent")
                         .HasColumnType("decimal(18,2)");
 

@@ -186,7 +186,8 @@ public static class ShopEndpoints
                     ProductId = product.Id,
                     Quantity = quantity,
                     UnitPrice = product.SalePrice,
-                    DiscountPercent = 0
+                    DiscountPercent = 0,
+                    CostPrice = product.CostPrice
                 });
             }
 

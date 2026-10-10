@@ -126,6 +126,16 @@ public class SalesOrderItem
     /// <summary>درصد تخفیف این قلم (۰ تا ۱۰۰)</summary>
     public decimal DiscountPercent { get; set; }
 
+    /// <summary>
+    /// بهای تمام‌شدهٔ هر واحد در لحظهٔ فروش.
+    /// عکس گرفته می‌شود تا تغییر قیمت خرید کالا، سود سفارش‌های قبلی را عوض نکند.
+    /// </summary>
+    public decimal CostPrice { get; set; }
+
+    /// <summary>بهای تمام‌شدهٔ کل این قلم — ذخیره نمی‌شود</summary>
+    [NotMapped]
+    public decimal CostTotal => Math.Round(Quantity * CostPrice, 0);
+
     /// <summary>جمع این قلم پس از تخفیف — ذخیره نمی‌شود</summary>
     [NotMapped]
     public decimal LineTotal

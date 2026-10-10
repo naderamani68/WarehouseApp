@@ -552,6 +552,9 @@ else
             return;
         }
 
+        // بهای تمام‌شدهٔ همین لحظه عکس گرفته می‌شود
+        line.CostPrice = product.CostPrice;
+
         if (line.UnitPriceValue <= 0 && product.SalePrice > 0)
         {
             line.UnitPrice = product.SalePrice.ToString(CultureInfo.InvariantCulture);
@@ -634,7 +637,8 @@ else
                     ProductId = line.ProductId,
                     Quantity = line.QuantityValue,
                     UnitPrice = line.UnitPriceValue,
-                    DiscountPercent = line.DiscountValue
+                    DiscountPercent = line.DiscountValue,
+                    CostPrice = line.CostPrice
                 });
             }
 
@@ -686,7 +690,8 @@ else
                 ProductId = i.ProductId,
                 Quantity = i.Quantity.ToString(CultureInfo.InvariantCulture),
                 UnitPrice = i.UnitPrice.ToString(CultureInfo.InvariantCulture),
-                Discount = i.DiscountPercent.ToString(CultureInfo.InvariantCulture)
+                Discount = i.DiscountPercent.ToString(CultureInfo.InvariantCulture),
+                CostPrice = i.CostPrice
             })
             .ToList();
 
@@ -1061,6 +1066,9 @@ else
         public string Quantity { get; set; } = "1";
         public string UnitPrice { get; set; } = "0";
         public string Discount { get; set; } = "0";
+
+        /// <summary>بهای تمام‌شدهٔ واحد در لحظهٔ انتخاب کالا</summary>
+        public decimal CostPrice { get; set; }
 
         public int QuantityValue => (int)ParseNum(Quantity);
         public decimal UnitPriceValue => ParseNum(UnitPrice);
