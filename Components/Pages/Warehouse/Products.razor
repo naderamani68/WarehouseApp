@@ -299,16 +299,16 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">قیمت فروش هر واحد (ریال)</label>
-            <MoneyInput Value="form.SalePrice" ValueChanged="v => form.SalePrice = v ?? string.Empty" />
+            <MoneyInput Value="@form.SalePrice" ValueChanged="v => form.SalePrice = v ?? string.Empty" />
         </div>
         <div class="col-md-3">
             <label class="form-label">بهای خرید هر واحد (ریال)</label>
-            <MoneyInput Value="form.CostPrice" ValueChanged="v => form.CostPrice = v ?? string.Empty" />
+            <MoneyInput Value="@form.CostPrice" ValueChanged="v => form.CostPrice = v ?? string.Empty" />
         </div>
 
         <div class="col-md-3">
             <label class="form-label">حد سفارش (هشدار کمبود)</label>
-            <NumberInput T="string" CssClass="form-control" Value="form.ReorderLevel" ValueChanged="v => form.ReorderLevel = v" MaxLength="9" />
+            <NumberInput T="string" CssClass="form-control" Value="@form.ReorderLevel" ValueChanged="v => form.ReorderLevel = v" MaxLength="9" />
         </div>
         <div class="col-md-3 d-flex align-items-end">
             <div class="form-check">

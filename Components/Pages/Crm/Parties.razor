@@ -62,7 +62,7 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">موبایل</label>
-                <MobileInput Value="formMobile" ValueChanged="v => formMobile = v ?? string.Empty" />
+                <MobileInput Value="@formMobile" ValueChanged="v => formMobile = v ?? string.Empty" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">ایمیل</label>
@@ -71,11 +71,11 @@ else
 
             <div class="col-md-3">
                 <label class="form-label">کد / شناسهٔ ملی</label>
-                <NumberInput T="string" CssClass="form-control" Value="formNationalId" ValueChanged="v => formNationalId = v" MaxLength="10" />
+                <NumberInput T="string" CssClass="form-control" Value="@formNationalId" ValueChanged="v => formNationalId = v" MaxLength="10" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">کد اقتصادی</label>
-                <NumberInput T="string" CssClass="form-control" Value="formEconomicCode" ValueChanged="v => formEconomicCode = v" MaxLength="14" />
+                <NumberInput T="string" CssClass="form-control" Value="@formEconomicCode" ValueChanged="v => formEconomicCode = v" MaxLength="14" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">شهر</label>
@@ -83,7 +83,7 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">کد پستی</label>
-                <NumberInput T="string" CssClass="form-control" Value="formPostalCode" ValueChanged="v => formPostalCode = v" MaxLength="10" />
+                <NumberInput T="string" CssClass="form-control" Value="@formPostalCode" ValueChanged="v => formPostalCode = v" MaxLength="10" />
             </div>
 
             <div class="col-md-8">

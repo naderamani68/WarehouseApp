@@ -107,7 +107,7 @@ else
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">تلفن همراه</label>
-                                <MobileInput Value="quickMobile" ValueChanged="v => quickMobile = v" />
+                                <MobileInput Value="@quickMobile" ValueChanged="v => quickMobile = v" />
                             </div>
                             <div class="col-md-4">
                                 <button class="btn btn-success w-100" @onclick="CreateQuickCustomerAsync" disabled="@quickBusy">
@@ -160,9 +160,9 @@ else
                                     }
                                 </select>
                             </td>
-                            <td><NumberInput T="string" CssClass="form-control form-control-sm" Value="line.Quantity" ValueChanged="v => line.Quantity = v" MaxLength="9" /></td>
-                            <td><MoneyInput CssClass="form-control form-control-sm" Value="line.UnitPrice" ValueChanged="v => line.UnitPrice = v ?? string.Empty" /></td>
-                            <td><NumberInput T="string" CssClass="form-control form-control-sm" AllowDecimal="true" Value="line.Discount" ValueChanged="v => line.Discount = v" MaxLength="6" /></td>
+                            <td><NumberInput T="string" CssClass="form-control form-control-sm" Value="@line.Quantity" ValueChanged="v => line.Quantity = v" MaxLength="9" /></td>
+                            <td><MoneyInput CssClass="form-control form-control-sm" Value="@line.UnitPrice" ValueChanged="v => line.UnitPrice = v ?? string.Empty" /></td>
+                            <td><NumberInput T="string" CssClass="form-control form-control-sm" AllowDecimal="true" Value="@line.Discount" ValueChanged="v => line.Discount = v" MaxLength="6" /></td>
                             <td class="fw-bold">@Money(line.Total)</td>
                             <td>
                                 <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveLine(line)" title="حذف قلم">

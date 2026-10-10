@@ -63,7 +63,7 @@ else
 
                 <div class="mb-3">
                     <label class="form-label">چند روز پشتیبان نگه داشته شود؟</label>
-                    <NumberInput T="int" CssClass="form-control" Style="max-width:140px" Value="keepDays" ValueChanged="v => keepDays = v" MaxLength="4" Disabled="@(!CanManage)" />
+                    <NumberInput T="int" CssClass="form-control" Style="max-width:140px" Value="@keepDays" ValueChanged="v => keepDays = v" MaxLength="4" Disabled="@(!CanManage)" />
                     <div class="form-text">صفر یعنی هیچ پشتیبانی خودکار پاک نشود.</div>
                 </div>
 
@@ -76,7 +76,7 @@ else
                 {
                     <div class="mb-3">
                         <label class="form-label">ساعت اجرای خودکار</label>
-                        <NumberInput T="int" CssClass="form-control" Style="max-width:140px" Value="autoHour" ValueChanged="v => autoHour = v" MaxLength="2" Disabled="@(!CanManage)" />
+                        <NumberInput T="int" CssClass="form-control" Style="max-width:140px" Value="@autoHour" ValueChanged="v => autoHour = v" MaxLength="2" Disabled="@(!CanManage)" />
                         <div class="form-text">
                             اگر برنامه در آن ساعت خاموش باشد، اولین باری که روشن شد پشتیبان گرفته می‌شود.
                         </div>
