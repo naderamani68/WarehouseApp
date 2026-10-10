@@ -100,7 +100,7 @@
 
         <div class="mb-3">
             <label class="form-label">تعداد:</label>
-            <input class="form-control" type="number" @bind="quantity" />
+            <NumberInput T="int" CssClass="form-control" Value="quantity" ValueChanged="v => quantity = v" MaxLength="9" />
         </div>
 
         <div class="mb-3">

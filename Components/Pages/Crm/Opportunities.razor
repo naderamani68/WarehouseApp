@@ -47,7 +47,7 @@ else
             </div>
             <div class="col-md-2">
                 <label class="form-label">احتمال موفقیت (٪)</label>
-                <input class="form-control" dir="ltr" @bind="formProbability" />
+                <NumberInput T="string" CssClass="form-control" AllowDecimal="true" Value="formProbability" ValueChanged="v => formProbability = v" MaxLength="6" />
             </div>
 
             <div class="col-md-3">
@@ -574,7 +574,7 @@ else
             : 0m;
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private static string? NullIfEmpty(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

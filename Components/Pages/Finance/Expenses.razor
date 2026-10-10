@@ -86,7 +86,7 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">تعداد خریداری‌شده (اختیاری)</label>
-                <input class="form-control" dir="ltr" @bind="formQuantity" />
+                <NumberInput T="string" CssClass="form-control" Value="formQuantity" ValueChanged="v => formQuantity = v" MaxLength="9" />
             </div>
 
             <div class="col-12">
@@ -586,7 +586,7 @@ else
 
     private async Task DeleteAsync(Expense item)
     {
-        var ok = await JS.InvokeAsync<bool>("confirm", $"هزینهٔ «{item.Title}» به مبلغ {item.Amount:N0} حذف شود؟");
+        var ok = await JS.InvokeAsync<bool>("confirm", $"هزینهٔ «{item.Title}» به مبلغ {Money(item.Amount)} حذف شود؟");
         if (!ok)
         {
             return;
@@ -671,7 +671,7 @@ else
         return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 0m;
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private static string? NullIfEmpty(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

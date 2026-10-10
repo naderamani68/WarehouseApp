@@ -329,7 +329,7 @@ else
         await LoadChannelSalesAsync();
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private static string StageBarClass(OpportunityStage stage) => stage switch
     {

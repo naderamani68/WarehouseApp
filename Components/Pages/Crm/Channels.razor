@@ -38,7 +38,7 @@ else
             </div>
             <div class="col-md-2">
                 <label class="form-label">ترتیب نمایش</label>
-                <input type="number" class="form-control" dir="ltr" @bind="formSort" />
+                <NumberInput T="int" CssClass="form-control" Value="formSort" ValueChanged="v => formSort = v" MaxLength="4" />
             </div>
             <div class="col-md-1">
                 <label class="form-label">فعال</label>

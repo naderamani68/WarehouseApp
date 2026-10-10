@@ -219,5 +219,5 @@ else
 
     private static string Count(int value) => value.ToString("N0", Fa);
 
-    private static string Money(decimal value) => value.ToString("N0", Fa);
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".");
 }

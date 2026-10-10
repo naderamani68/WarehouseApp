@@ -253,7 +253,7 @@
     private string Company(string key, string fallback = "") =>
         settings.TryGetValue(key, out var value) && value.Length > 0 ? value : fallback;
 
-    private static string Money(decimal value) => value.ToString("N0", Fa);
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".");
 
     private async Task PrintAsync() => await JS.InvokeVoidAsync("print");
 }

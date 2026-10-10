@@ -536,7 +536,7 @@ else
     private async Task ConfirmSettle(Debt item)
     {
         var ok = await JS.InvokeAsync<bool>("confirm",
-            $"تسویهٔ کامل «{item.Title}» با مبلغ {item.Remaining:N0} ریال ثبت شود؟");
+            $"تسویهٔ کامل «{item.Title}» با مبلغ {Money(item.Remaining)} ریال ثبت شود؟");
         if (!ok)
         {
             return;
@@ -656,7 +656,7 @@ else
         return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 0m;
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private static string? NullIfEmpty(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -53,6 +53,8 @@ else
                         {
                             <div class="input-group">
                                 <input class="form-control" dir="ltr"
+                                       data-number-only="@(item.ValueType == "percent" ? "true" : null)"
+                                       data-digits-only="@(item.ValueType == "number" ? "true" : null)"
                                        value="@draft[item.Key]"
                                        @onchange="e => Set(item.Key, e.Value?.ToString())" />
                                 @if (item.ValueType == "percent")
@@ -169,7 +171,7 @@ else
 
     private static bool IsTrue(string? value) => SettingsService.ParseBool(value) ?? false;
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private async Task SaveAsync()
     {

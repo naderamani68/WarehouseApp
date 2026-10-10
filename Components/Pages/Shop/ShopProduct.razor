@@ -104,7 +104,7 @@
                         <div class="d-flex gap-2 align-items-end" style="max-width:340px">
                             <div>
                                 <label class="form-label">تعداد</label>
-                                <input class="form-control" type="number" name="quantity" value="1"
+                                <input class="form-control" type="number" inputmode="numeric" data-digits-only="true" name="quantity" value="1"
                                        min="1" max="@Math.Max(1, product.Available)" />
                             </div>
 
@@ -143,5 +143,5 @@
         product = await Catalog.GetProductAsync(Id);
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa);
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".");
 }

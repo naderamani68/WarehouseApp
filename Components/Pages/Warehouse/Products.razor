@@ -308,7 +308,7 @@
 
         <div class="col-md-3">
             <label class="form-label">حد سفارش (هشدار کمبود)</label>
-            <input class="form-control" dir="ltr" @bind="form.ReorderLevel" />
+            <NumberInput T="string" CssClass="form-control" Value="form.ReorderLevel" ValueChanged="v => form.ReorderLevel = v" MaxLength="9" />
         </div>
         <div class="col-md-3 d-flex align-items-end">
             <div class="form-check">
@@ -1178,7 +1178,7 @@
         return decimal.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : 0m;
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private static string? NullIfEmpty(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

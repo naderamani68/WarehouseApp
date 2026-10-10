@@ -69,7 +69,7 @@
                                             <form method="post" action="/shop/cart/update" class="d-flex gap-1">
                                                 <AntiforgeryToken />
                                                 <input type="hidden" name="productId" value="@line.Product.Id" />
-                                                <input class="form-control form-control-sm" type="number"
+                                                <input class="form-control form-control-sm" type="number" inputmode="numeric" data-digits-only="true"
                                                        name="quantity" value="@line.Quantity" min="0" max="999" />
                                                 <button class="btn btn-sm btn-outline-secondary" type="submit" title="به‌روزرسانی">
                                                     <span class="bi bi-arrow-repeat" aria-hidden="true"></span>
@@ -192,7 +192,7 @@
         total = lines.Sum(l => l.Product.Price * l.Quantity);
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa);
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".");
 
     private record CartLine(ShopProductDto Product, int Quantity);
 }

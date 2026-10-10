@@ -357,7 +357,7 @@ else
         stats = await FinanceService.GetStatsAsync(Db);
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private async Task ExportAsync()
     {

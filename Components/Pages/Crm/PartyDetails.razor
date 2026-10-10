@@ -398,7 +398,7 @@ else
         }
     }
 
-    private static string Money(decimal value) => value.ToString("N0", Fa) + " ریال";
+    private static string Money(decimal value) => value.ToString("N0", Fa).Replace(",", ".") + " ریال";
 
     private record ProfileRow(
         string Kind, string Status, string Title, string? Details, DateTime At,

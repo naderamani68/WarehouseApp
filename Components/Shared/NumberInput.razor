@@ -1,0 +1,103 @@
+﻿@* ورودی عددی — فقط رقم؛ برای تعداد، درصد، کد ملی، کد پستی، ترتیب و شمارهٔ سند *@
+@typeparam T
+@using System.Globalization
+
+<input class="@CssClass"
+       dir="ltr"
+       inputmode="numeric"
+       style="@Style"
+       placeholder="@Placeholder"
+       value="@text"
+       @attributes="Attrs"
+       @oninput="OnInputAsync"
+       disabled="@Disabled" />
+
+@code {
+    /// <summary>مقدار عددی یا متنی — رقم خام و بدون جداکننده ذخیره می‌شود</summary>
+    [Parameter] public T Value { get; set; } = default!;
+
+    [Parameter] public EventCallback<T> ValueChanged { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>اجازهٔ یک نقطهٔ اعشار — برای درصد</summary>
+    [Parameter] public bool AllowDecimal { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "0";
+
+    [Parameter] public string CssClass { get; set; } = "form-control";
+
+    [Parameter] public string? Style { get; set; }
+
+    /// <summary>حداکثر رقم — صفر یعنی بی‌حد</summary>
+    [Parameter] public int MaxLength { get; set; }
+
+    private string text = string.Empty;
+
+    private Dictionary<string, object> Attrs
+    {
+        get
+        {
+            var attrs = new Dictionary<string, object>
+            {
+                [AllowDecimal ? "data-number-only" : "data-digits-only"] = "true"
+            };
+
+            if (MaxLength > 0)
+            {
+                attrs["maxlength"] = MaxLength;
+            }
+
+            return attrs;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var current = ToRaw(Value);
+
+        // نقطهٔ اعشار نیمه‌کاره پاک نمی‌شود
+        if (text.Length == 0 || text.TrimEnd('.') != current.TrimEnd('.'))
+        {
+            text = current;
+        }
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs args)
+    {
+        text = args.Value?.ToString() ?? string.Empty;
+
+        var value = Convert(text);
+
+        if (!Equals(value, Value))
+        {
+            await ValueChanged.InvokeAsync(value);
+        }
+    }
+
+    private static string ToRaw(object? value) => value switch
+    {
+        null => string.Empty,
+        string s => s,
+        decimal d => d.ToString(CultureInfo.InvariantCulture),
+        int i => i.ToString(CultureInfo.InvariantCulture),
+        _ => value.ToString() ?? string.Empty
+    };
+
+    private static T Convert(string raw)
+    {
+        if (typeof(T) == typeof(string)) { return (T)(object)raw; }
+
+        if (typeof(T) == typeof(decimal) || typeof(T) == typeof(decimal?))
+        {
+            return (T)(object)(decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : 0m);
+        }
+
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(int?))
+        {
+            return (T)(object)(int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : 0);
+        }
+
+        return default!;
+    }
+}
