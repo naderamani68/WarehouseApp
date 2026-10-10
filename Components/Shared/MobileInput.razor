@@ -4,7 +4,7 @@
 <input class="form-control @(hasError ? "is-invalid" : "")"
        dir="ltr"
        inputmode="numeric"
-       maxlength="11"
+       maxlength="11" data-digits-only="true"
        placeholder="@Placeholder"
        value="@Value"
        @oninput="OnInputAsync"
