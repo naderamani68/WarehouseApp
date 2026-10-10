@@ -141,6 +141,20 @@ else
             </select>
         </div>
         <div class="col-md-2">
+            @if (CanManage)
+            {
+                <label for="partyImportFile" class="btn btn-outline-success w-100 mb-2" title="ورود گروهی طرف حساب‌ها از فایل اکسل">
+                    <i class="bi bi-upload me-1"></i>
+                    ورود از اکسل
+                </label>
+                <InputFile id="partyImportFile" OnChange="ImportParties" accept=".xlsx,.xlsm" class="d-none" />
+
+                <button class="btn btn-outline-secondary w-100 mb-2" @onclick="DownloadPartyTemplate" title="فایل نمونهٔ ورود طرف حساب‌ها">
+                    <i class="bi bi-file-earmark-arrow-down me-1"></i>
+                    نمونهٔ اکسل
+                </button>
+            }
+
             <button class="btn btn-success w-100" @onclick="ExportExcelAsync" disabled="@(!CanExport || isExporting)">
                 @if (isExporting)
                 {
@@ -534,7 +548,53 @@ else
         }
     }
 
-    private async Task ExportExcelAsync()
+        /// <summary>دانلود فایل نمونهٔ ورود طرف حساب‌ها</summary>
+    private async Task DownloadPartyTemplate()
+    {
+        var bytes = WarehouseApp.Services.ExcelTemplates.Parties();
+        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-طرف-حسابها.xlsx", Convert.ToBase64String(bytes));
+    }
+
+    /// <summary>ورود گروهی طرف حساب‌ها از فایل اکسل</summary>
+    private async Task ImportParties(InputFileChangeEventArgs e)
+    {
+        if (!CanManage)
+        {
+            Toasts.ShowError("شما اجازهٔ افزودن طرف حساب را ندارید");
+            return;
+        }
+
+        if (e.File is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            memory.Position = 0;
+
+            var service = new WarehouseApp.Services.ExcelImportService(Db);
+            var result = await service.ImportPartiesAsync(memory);
+
+            Toasts.ShowSuccess(result.Summary);
+
+            foreach (var note in result.Notes)
+            {
+                Toasts.ShowSuccess(note);
+            }
+
+            await AuditAsync("ورود از اکسل", "طرف حساب", 0, result.Summary);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خواندن فایل: {ex.Message}");
+        }
+    }
+private async Task ExportExcelAsync()
     {
         if (!CanExport)
         {

@@ -73,6 +73,17 @@
                     <input class="form-control form-control-sm"
                            placeholder="🔍 جستجو..."
                            @bind="searchTerm" @bind:event="oninput" />
+                    @if (Can(Permissions.ManageCategories))
+                    {
+                        <label for="categoryImportFile" class="btn btn-sm btn-outline-success text-nowrap mb-0" title="ورود گروهی دسته‌بندی‌ها از فایل اکسل">
+                            <i class="bi bi-upload"></i>
+                        </label>
+                        <InputFile id="categoryImportFile" OnChange="ImportCategories" accept=".xlsx,.xlsm" class="d-none" />
+
+                        <button class="btn btn-sm btn-outline-secondary text-nowrap" @onclick="DownloadCategoryTemplate" title="فایل نمونهٔ ورود دسته‌بندی‌ها">
+                            <i class="bi bi-file-earmark-arrow-down"></i>
+                        </button>
+                    }
                     <button class="btn btn-sm btn-success text-nowrap" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
                         @if (isExporting)
                         {
@@ -414,7 +425,53 @@
     }
 
     // ===== 🆕 خروجی Excel =====
-    private async Task ExportExcel()
+        /// <summary>دانلود فایل نمونهٔ ورود دسته‌بندی‌ها</summary>
+    private async Task DownloadCategoryTemplate()
+    {
+        var bytes = WarehouseApp.Services.ExcelTemplates.Categories();
+        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-دسته‌بندیها.xlsx", Convert.ToBase64String(bytes));
+    }
+
+    /// <summary>ورود گروهی دسته‌بندی‌ها از فایل اکسل</summary>
+    private async Task ImportCategories(InputFileChangeEventArgs e)
+    {
+        if (!Can(Permissions.ManageCategories))
+        {
+            Toasts.ShowError("شما اجازهٔ افزودن دسته‌بندی را ندارید");
+            return;
+        }
+
+        if (e.File is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            memory.Position = 0;
+
+            var service = new WarehouseApp.Services.ExcelImportService(Db);
+            var result = await service.ImportCategoriesAsync(memory);
+
+            Toasts.ShowSuccess(result.Summary);
+
+            foreach (var note in result.Notes)
+            {
+                Toasts.ShowSuccess(note);
+            }
+
+            await AuditAsync("ورود از اکسل", "دسته‌بندی", 0, result.Summary);
+            await LoadCategories();
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در خواندن فایل: {ex.Message}");
+        }
+    }
+private async Task ExportExcel()
     {
         if (!Can(Permissions.ExportExcel))
         {
