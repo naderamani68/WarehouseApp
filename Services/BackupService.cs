@@ -221,7 +221,7 @@ public class BackupService
 
             Directory.CreateDirectory(folder);
 
-            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
+            var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var file = Path.Combine(folder, $"WarehouseAppDb_{stamp}.bak");
 
             var database = db.Database.GetDbConnection().Database;
@@ -382,6 +382,96 @@ public class BackupService
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>بازیابی پایگاه داده از یک فایل پشتیبان</summary>
+    public async Task<BackupResult> RestoreAsync(string filePath)
+    {
+        try
+        {
+            var folder = Path.GetFullPath(await GetFolderAsync());
+            var full = Path.GetFullPath(filePath);
+
+            // فقط فایل‌های داخل پوشهٔ پشتیبان و با پسوند bak مجاز هستند
+            if (!full.StartsWith(folder, StringComparison.OrdinalIgnoreCase)
+                || !full.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
+            {
+                return new BackupResult(false, "این فایل، فایل پشتیبان معتبری نیست.", null, null, 0, 0, 0);
+            }
+
+            if (!File.Exists(full))
+            {
+                return new BackupResult(false, "فایل پشتیبان پیدا نشد.", null, null, 0, 0, 0);
+            }
+
+            // ۱) پیش از بازیابی، از وضعیت فعلی پشتیبان گرفته می‌شود تا راه برگشت باشد
+            var safety = await RunAsync();
+
+            if (!safety.Success)
+            {
+                return new BackupResult(false,
+                    $"پشتیبان‌گیری از وضعیت فعلی انجام نشد، پس بازیابی متوقف شد — {safety.Message}",
+                    null, null, 0, 0, 0);
+            }
+
+            var database = db.Database.GetDbConnection().Database;
+            var safeDatabase = Escape(database.Replace("]", "]]"));
+            var safeFile = Escape(full);
+
+            db.Database.SetCommandTimeout(900);
+
+            // ۲) بررسی سلامت فایل پشتیبان پیش از هر تغییری
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync($"RESTORE VERIFYONLY FROM DISK = N'{safeFile}'");
+            }
+            catch (Exception ex)
+            {
+                return new BackupResult(false, $"فایل پشتیبان سالم نیست: {Shorten(ex.Message)}", null, null, 0, 0, 0);
+            }
+
+            // ۳) بازیابی؛ همهٔ دستورها یک‌جا فرستاده می‌شوند تا روی یک اتصال اجرا شوند
+            //    اگر خطایی بیفتد، پایگاه داده در هر حالت به کار چندکاربره برمی‌گردد
+            var sql = $@"
+BEGIN TRY
+    ALTER DATABASE [{safeDatabase}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    RESTORE DATABASE [{safeDatabase}] FROM DISK = N'{safeFile}' WITH REPLACE;
+    ALTER DATABASE [{safeDatabase}] SET MULTI_USER;
+END TRY
+BEGIN CATCH
+    BEGIN TRY
+        ALTER DATABASE [{safeDatabase}] SET MULTI_USER;
+    END TRY
+    BEGIN CATCH
+    END CATCH;
+
+    THROW;
+END CATCH";
+
+            await db.Database.ExecuteSqlRawAsync(sql);
+
+            // اتصال‌های سوخته از استخر کنار گذاشته می‌شوند
+            Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
+
+            logger.LogInformation("بازیابی انجام شد: {File}", full);
+
+            return new BackupResult(true, "بازیابی با موفقیت انجام شد", folder, full, new FileInfo(full).Length, 0, 0);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "خطا در بازیابی");
+
+            try
+            {
+                Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
+            }
+            catch
+            {
+                // بی‌اهمیت
+            }
+
+            return new BackupResult(false, Shorten(ex.Message), null, null, 0, 0, 0);
         }
     }
 

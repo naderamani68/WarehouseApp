@@ -8,6 +8,7 @@
 @inject ApplicationDbContext Db
 @inject AccessService Access
 @inject BackupService BackupSvc
+@inject AuthService AuthSvc
 @inject ToastService Toasts
 
 @* پشتیبان‌گیری از پایگاه داده و عکس‌های کالا *@
@@ -177,11 +178,56 @@ else
     @if (backups.Count > 0)
     {
         <div class="card p-3 mt-3">
-            <h6 class="mb-2">♻️ بازیابی پشتیبان</h6>
-            <p class="small mb-2">
-                برای بازیابی، <strong>اول برنامه را ببند</strong>، بعد این دستور را در ابزار خط فرمان پایگاه داده اجرا کن:
-            </p>
-            <pre class="small mb-0" dir="ltr" style="white-space:pre-wrap">@RestoreCommand</pre>
+            <h6 class="mb-2">♻️ بازیابی از پشتیبان</h6>
+
+            @if (restored)
+            {
+                <div class="alert alert-success mb-0">
+                    <div class="fw-bold">بازیابی انجام شد ✅</div>
+                    <div class="small mt-1">
+                        داده‌های فایل انتخاب‌شده برگشت. برای دیدنشان یک‌بار از حساب خارج شو و دوباره وارد شو.
+                    </div>
+                    <a class="btn btn-primary btn-sm mt-2" href="/account/logout">خروج و ورود دوباره</a>
+                </div>
+            }
+            else if (backups.Count == 0)
+            {
+                <div class="alert alert-secondary small mb-0">
+                    هنوز هیچ فایل پشتیبانی ساخته نشده است. اول یک پشتیبان بگیر.
+                </div>
+            }
+            else
+            {
+                <p class="small mb-2">
+                    با این کار، داده‌های فعلی با محتوای فایل پشتیبان جایگزین می‌شود.
+                    پیش از بازیابی یک پشتیبان تازه از وضعیت فعلی گرفته می‌شود تا اگر پشیمان شدی، راه برگشت باشد.
+                </p>
+
+                <div class="mb-2">
+                    <label class="form-label small mb-1">کدام نسخه بازیابی شود؟</label>
+                    <select class="form-select" @bind="restorePath" disabled="@busy">
+                        @foreach (var item in backups)
+                        {
+                            <option value="@item.FullPath">@item.Name — @item.CreatedAt.ToString("yyyy/MM/dd HH:mm", Fa)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label small mb-1">رمز عبور مدیر</label>
+                    <input type="password" class="form-control" dir="ltr" data-latin-password="true"
+                           @bind="restorePassword" disabled="@busy" autocomplete="current-password" />
+                </div>
+
+                <button class="btn btn-danger btn-sm" @onclick="RestoreAsync" disabled="@busy">
+                    @(busy ? "در حال بازیابی..." : "بازیابی کن")
+                </button>
+
+                <details class="mt-3">
+                    <summary class="small text-muted">روش دستی — فقط برای مواقع اضطراری</summary>
+                    <pre class="small mt-2 mb-0" dir="ltr" style="white-space:pre-wrap">@RestoreCommand</pre>
+                </details>
+            }
         </div>
     }
 }
@@ -203,6 +249,10 @@ else
     private string lastResult = string.Empty;
     private List<BackupFile> backups = new();
     private BackupResult? result;
+
+    private string restorePath = string.Empty;
+    private string restorePassword = string.Empty;
+    private bool restored;
 
     private string TaskCommand => $"schtasks /Create /TN \"WarehouseApp Backup\" /TR \"powershell -ExecutionPolicy Bypass -File \\\"{BackupSvc.ScriptPath}\\\"\" /SC DAILY /ST 23:00 /RL HIGHEST";
 
@@ -233,6 +283,7 @@ else
         lastRun = await BackupSvc.GetLastRunAsync();
         lastResult = await BackupSvc.GetLastResultAsync();
         backups = BackupSvc.ListBackups(folder);
+        restorePath = backups.FirstOrDefault()?.FullPath ?? string.Empty;
     }
 
     private async Task RefreshAsync()
@@ -244,6 +295,7 @@ else
         lastRun = await BackupSvc.GetLastRunAsync();
         lastResult = await BackupSvc.GetLastResultAsync();
         backups = BackupSvc.ListBackups(folder);
+        restorePath = backups.FirstOrDefault()?.FullPath ?? string.Empty;
     }
 
     private async Task SaveSettingsAsync()
@@ -290,6 +342,63 @@ else
         catch (Exception ex)
         {
             Toasts.ShowError($"خطا: {ex.Message}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RestoreAsync()
+    {
+        if (string.IsNullOrWhiteSpace(restorePath))
+        {
+            Toasts.ShowError("اول یک نسخهٔ پشتیبان انتخاب کن");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(restorePassword))
+        {
+            Toasts.ShowError("رمز عبور مدیر را وارد کن");
+            return;
+        }
+
+        busy = true;
+
+        try
+        {
+            var user = AuthState is null ? null : (await AuthState).User;
+            var username = user?.Identity?.Name ?? string.Empty;
+
+            if (AccessService.GetEmployeeId(user) is null)
+            {
+                Toasts.ShowError("کاربر شناسایی نشد");
+                return;
+            }
+
+            var check = await AuthSvc.ValidateAsync(username, restorePassword);
+
+            if (!check.Success)
+            {
+                Toasts.ShowError("رمز عبور نادرست است");
+                return;
+            }
+
+            var info = await BackupSvc.RestoreAsync(restorePath);
+
+            if (!info.Success)
+            {
+                Toasts.ShowError($"بازیابی انجام نشد: {info.Message}");
+                return;
+            }
+
+            restorePassword = string.Empty;
+            restored = true;
+            Toasts.ShowSuccess("بازیابی انجام شد");
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در بازیابی: {ex.Message}");
         }
         finally
         {
