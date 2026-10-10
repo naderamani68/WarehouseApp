@@ -100,6 +100,14 @@
             ورود قیمت‌ها
         </label>
         <InputFile id="priceImportFile" OnChange="ImportPrices" accept=".xlsx,.xlsm" class="d-none" />
+        <button class="btn btn-outline-secondary mb-0" @onclick="DownloadProductTemplate" title="فایل نمونهٔ ورود گروهی کالاها">
+            <i class="bi bi-file-earmark-arrow-down me-1"></i>
+            نمونهٔ کالاها
+        </button>
+        <button class="btn btn-outline-secondary mb-0" @onclick="DownloadPriceTemplate" title="فایل نمونهٔ ورود قیمت‌ها">
+            <i class="bi bi-file-earmark-arrow-down me-1"></i>
+            نمونهٔ قیمت‌ها
+        </button>
         <button class="btn btn-success" @onclick="ExportExcel" disabled="@(!Can(Permissions.ExportExcel) || isExporting)">
             @if (isExporting)
             {
@@ -788,6 +796,20 @@
         }
     }
     /// <summary>ورود گروهی کالا از فایل اکسل — ستون‌ها: کد، نام، واحد، قیمت فروش، بهای خرید، موجودی، حد سفارش، دسته</summary>
+    /// <summary>دانلود فایل نمونهٔ ورود گروهی کالاها</summary>
+    private async Task DownloadProductTemplate()
+    {
+        var bytes = WarehouseApp.Services.ExcelTemplates.Products();
+        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-کالاها.xlsx", Convert.ToBase64String(bytes));
+    }
+
+    /// <summary>دانلود فایل نمونهٔ ورود قیمت‌ها</summary>
+    private async Task DownloadPriceTemplate()
+    {
+        var bytes = WarehouseApp.Services.ExcelTemplates.Prices();
+        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-قیمت‌ها.xlsx", Convert.ToBase64String(bytes));
+    }
+
     private async Task ImportProducts(InputFileChangeEventArgs e)
     {
         if (!Can(Permissions.ManageProducts))
