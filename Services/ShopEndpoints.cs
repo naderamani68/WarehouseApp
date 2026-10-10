@@ -99,11 +99,11 @@ public static class ShopEndpoints
             }
 
             var customerName = (name ?? string.Empty).Trim();
-            var customerPhone = ShopCatalogService.NormalizePhone(phone);
+            var customerPhone = Mobile.Normalize(phone);
             var customerAddress = (address ?? string.Empty).Trim();
             var customerNote = (note ?? string.Empty).Trim();
 
-            if (customerName.Length < 3 || customerPhone.Length < 10)
+            if (customerName.Length < 3 || !Mobile.IsValid(customerPhone))
             {
                 return Results.Redirect("/shop/cart?error=info");
             }

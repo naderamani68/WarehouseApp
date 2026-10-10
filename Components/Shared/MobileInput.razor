@@ -1,0 +1,42 @@
+﻿@* ورودی شمارهٔ همراه — فقط رقم لاتین، حداکثر ۱۱ رقم، با بررسی درستی *@
+@using WarehouseApp.Services
+
+<input class="form-control @(hasError ? "is-invalid" : "")"
+       dir="ltr"
+       inputmode="numeric"
+       maxlength="11"
+       placeholder="@Placeholder"
+       value="@Value"
+       @oninput="OnInputAsync"
+       disabled="@Disabled" />
+
+@if (hasError && ShowError)
+{
+    <div class="form-text text-danger">شمارهٔ همراه باید ۱۱ رقم باشد و با ۰۹ شروع شود.</div>
+}
+
+@code {
+    /// <summary>شمارهٔ همراه — همیشه به‌صورت رقم لاتین نگه داشته می‌شود</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "09123456789";
+
+    /// <summary>نمایش پیام خطا زیر فیلد</summary>
+    [Parameter] public bool ShowError { get; set; } = true;
+
+    private bool hasError => !string.IsNullOrWhiteSpace(Value) && !Mobile.IsValid(Value);
+
+    private async Task OnInputAsync(ChangeEventArgs args)
+    {
+        var digits = Mobile.DigitsOnly(args.Value?.ToString(), Mobile.Length);
+
+        if (digits != Value)
+        {
+            await ValueChanged.InvokeAsync(digits);
+        }
+    }
+}

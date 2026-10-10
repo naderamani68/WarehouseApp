@@ -62,7 +62,7 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">موبایل</label>
-                <input class="form-control" dir="ltr" @bind="formMobile" />
+                <MobileInput Value="formMobile" ValueChanged="v => formMobile = v ?? string.Empty" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">ایمیل</label>
@@ -438,6 +438,16 @@ else
             Toasts.ShowError("طرف حسابی با این کد از قبل ثبت شده است");
             return;
         }
+
+        if (!string.IsNullOrWhiteSpace(formMobile) && !WarehouseApp.Services.Mobile.IsValid(formMobile))
+        {
+            Toasts.ShowError("شمارهٔ موبایل باید ۱۱ رقم باشد و با ۰۹ شروع شود");
+            return;
+        }
+
+        formMobile = string.IsNullOrWhiteSpace(formMobile)
+            ? string.Empty
+            : WarehouseApp.Services.Mobile.Normalize(formMobile);
 
         try
         {

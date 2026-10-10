@@ -107,7 +107,7 @@ else
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">تلفن همراه</label>
-                                <input class="form-control" dir="ltr" @bind="quickMobile" placeholder="09123456789" />
+                                <MobileInput Value="quickMobile" ValueChanged="v => quickMobile = v" />
                             </div>
                             <div class="col-md-4">
                                 <button class="btn btn-success w-100" @onclick="CreateQuickCustomerAsync" disabled="@quickBusy">
@@ -721,13 +721,13 @@ else
             return;
         }
 
-        var mobile = WarehouseApp.Services.ShopCatalogService.NormalizePhone(quickMobile);
-
-        if (mobile.Length < 10)
+        if (!WarehouseApp.Services.Mobile.IsValid(quickMobile))
         {
-            Toasts.ShowError("شمارهٔ همراه معتبر نیست — مثل 09123456789");
+            Toasts.ShowError("شمارهٔ همراه باید ۱۱ رقم باشد و با ۰۹ شروع شود");
             return;
         }
+
+        var mobile = WarehouseApp.Services.Mobile.Normalize(quickMobile);
 
         try
         {
