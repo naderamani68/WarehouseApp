@@ -37,14 +37,40 @@
         }
     </div>
 
-    @* ===== هشدار سفارش‌های در انتظار تأیید ===== *@
-    @if (pendingOrders > 0)
-    {
-        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <span>🧾 تعداد @pendingOrders سفارش فروش در انتظار تأیید است.</span>
-            <a class="btn btn-sm btn-warning" href="crm/orders">بررسی سفارش‌ها</a>
+    @* ===== کارت سفارش‌های در انتظار بررسی — با کلیک، صفحهٔ سفارش‌ها باز می‌شود ===== *@
+    <div class="row g-3 mt-4">
+        <div class="col-md-6 col-lg-4">
+            <div class="card pending-card h-100 @(pendingOrders > 0 ? "pending-active" : "")"
+                 @onclick="OpenPendingOrders">
+
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="pending-icon">🧾</div>
+
+                    <div class="flex-grow-1">
+                        <div class="text-muted small">سفارش در انتظار بررسی</div>
+
+                        <div class="pending-number">@pendingOrders.ToString("N0", Fa)</div>
+
+                        @if (pendingOrders == 0)
+                        {
+                            <div class="small text-success">همهٔ سفارش‌ها بررسی شده است ✅</div>
+                        }
+                        else
+                        {
+                            @if (shopPendingOrders > 0)
+                            {
+                                <div class="small text-muted">
+                                    از این تعداد @shopPendingOrders.ToString("N0", Fa) سفارش اینترنتی است
+                                </div>
+                            }
+                            <div class="small fw-semibold mt-1">برای تأیید و بررسی کلیک کن ←</div>
+                        }
+                    </div>
+                </div>
+
+            </div>
         </div>
-    }
+    </div>
 
     @* ===== نمودار Top 5 محصول (CSS) - کشویی ===== *@
     <div class="inventory-section mt-5">
@@ -393,8 +419,16 @@
     private bool showChart = false;
     private bool isExporting = false;
 
-    /// <summary>سفارش‌های فروش در انتظار تأیید</summary>
+    /// <summary>سفارش‌های فروش در انتظار بررسی</summary>
     private int pendingOrders;
+
+    /// <summary>از میان آن‌ها، سفارش‌هایی که از فروشگاه اینترنتی آمده‌اند</summary>
+    private int shopPendingOrders;
+
+    private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
+
+    /// <summary>رفتن به صفحهٔ سفارش‌ها با فیلتر پیش‌نویس</summary>
+    private void OpenPendingOrders() => Nav.NavigateTo($"crm/orders?status={(int)OrderStatus.Draft}");
 
     // ===== فیلترها =====
     private string? productSearch;
@@ -419,6 +453,7 @@
         await LoadTopProductsAsync();
 
         pendingOrders = await Db.SalesOrders.CountAsync(o => o.Status == OrderStatus.Draft);
+        shopPendingOrders = await Db.SalesOrders.CountAsync(o => o.Status == OrderStatus.Draft && o.Source == OrderSource.Shop);
     }
 
     // ===== بارگذاری موجودی از StockMovements =====
@@ -559,6 +594,36 @@
     .shortcut-icon {
         font-size: 2.5rem;
         line-height: 1;
+    }
+
+    /* ===== کارت سفارش‌های در انتظار بررسی ===== */
+    .pending-card {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+
+        .pending-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+        }
+
+    .pending-active {
+        border-color: #f59e0b;
+        background: linear-gradient(135deg, #fffbeb, #ffffff);
+    }
+
+    .pending-icon {
+        font-size: 2.2rem;
+        line-height: 1;
+    }
+
+    .pending-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-main);
+        line-height: 1.1;
     }
 
     /* ===== بخش Collapsible ===== */

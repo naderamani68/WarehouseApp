@@ -1,0 +1,49 @@
+﻿@* ورودی مبلغ — فقط رقم، با جداکنندهٔ سهرقمی مثل 200.000 *@
+@using WarehouseApp.Services
+
+<input class="@CssClass"
+       dir="ltr"
+       inputmode="numeric"
+       placeholder="@Placeholder"
+       value="@text"
+       @oninput="OnInputAsync"
+       disabled="@Disabled" />
+
+@code {
+    /// <summary>مبلغ به‌صورت رقم خام و بدون جداکننده — مثل 200000</summary>
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "0";
+
+    /// <summary>کلاس ظاهری — مثلاً form-control-sm برای جدول‌ها</summary>
+    [Parameter] public string CssClass { get; set; } = "form-control";
+
+    /// <summary>همان چیزی که در کادر دیده می‌شود</summary>
+    private string text = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        // اگر مقدار از بیرون عوض شده باشد (مثلاً برای ویرایش)، کادر تازه‌سازی می‌شود
+        if (text.Length == 0 || MoneyText.DigitsOnly(text) != MoneyText.DigitsOnly(Value))
+        {
+            text = string.IsNullOrEmpty(Value) ? string.Empty : MoneyText.Group(MoneyText.Parse(Value));
+        }
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs args)
+    {
+        var digits = MoneyText.DigitsOnly(args.Value?.ToString());
+
+        // متن کادر همیشه تمیز و جداکننده‌دار می‌ماند
+        text = digits.Length == 0 ? string.Empty : MoneyText.Group(MoneyText.Parse(digits));
+
+        if (digits != Value)
+        {
+            await ValueChanged.InvokeAsync(digits);
+        }
+    }
+}

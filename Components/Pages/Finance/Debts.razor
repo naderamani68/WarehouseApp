@@ -83,12 +83,12 @@ else
             </div>
             <div class="col-md-3">
                 <label class="form-label">مبلغ کل (ریال)</label>
-                <input class="form-control" dir="ltr" @bind="formAmount" />
+                <MoneyInput Value="formAmount" ValueChanged="v => formAmount = v ?? string.Empty" />
             </div>
 
             <div class="col-md-3">
                 <label class="form-label">مبلغ پرداخت‌شده تا حالا</label>
-                <input class="form-control" dir="ltr" @bind="formPaid" />
+                <MoneyInput Value="formPaid" ValueChanged="v => formPaid = v ?? string.Empty" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">تاریخ ایجاد</label>
@@ -235,7 +235,7 @@ else
                                     @if (payingId == item.Id)
                                     {
                                         <div class="d-flex gap-1">
-                                            <input class="form-control form-control-sm" dir="ltr" style="width:110px" @bind="payAmount" />
+                                            <MoneyInput CssClass="form-control form-control-sm" Value="payAmount" ValueChanged="v => payAmount = v ?? string.Empty" />
                                             <button class="btn btn-sm btn-success" @onclick="() => RegisterPaymentAsync(item)">
                                                 ثبت
                                             </button>
