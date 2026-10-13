@@ -7,8 +7,7 @@ namespace WarehouseApp.Services;
 /// <summary>
 /// قالب‌های اکسل ورود داده.
 /// هر قالب در «یک گذر» ساخته می‌شود: برگهٔ داده + برگهٔ «فهرست‌ها» با دادهٔ واقعی سیستم.
-/// چرا یک‌گذری؟ چون بازکردن دوبارهٔ فایل ساخته‌شده، OpenXml را وادار به ساختن فایل موقت
-/// در پوشهٔ Temp می‌کند و روی بعضی سیستم‌ها دسترسی به آن پوشه بسته است.
+/// هر مقدار فهرست در خانهٔ جداگانه می‌نشیند تا کد و نام قاطی نشوند.
 /// </summary>
 public static class ExcelTemplates
 {
@@ -24,14 +23,14 @@ public static class ExcelTemplates
     private static readonly string[] CategoryHeaders =
         { "نام دسته", "دستهٔ مادر", "توضیح" };
 
-    private static readonly string?[] Units =
+    private static readonly string[] Units =
         { "عدد", "کارتن", "کیلوگرم", "لیتر", "بسته", "جعبه", "متر", "خدمت" };
 
-    private static readonly string?[] PartyTypes =
+    private static readonly string[] PartyTypes =
         { "مشتری", "تأمین‌کننده", "هر دو" };
 
-    private static readonly (string Title, IEnumerable<string?> Values)[] NoLists =
-        Array.Empty<(string, IEnumerable<string?>)>();
+    private static readonly (string[] Titles, IEnumerable<string[]> Rows)[] NoLists =
+        Array.Empty<(string[], IEnumerable<string[]>)>();
 
     // ================= قالب‌های پایه (بدون فهرست) =================
     public static byte[] Products() => Build("کالاها", ProductHeaders, NoLists);
@@ -53,10 +52,10 @@ public static class ExcelTemplates
             .Select(c => c.Name)
             .ToListAsync();
 
-        return Build("کالاها", ProductHeaders, new (string, IEnumerable<string?>)[]
+        return Build("کالاها", ProductHeaders, new (string[], IEnumerable<string[]>)[]
         {
-            ("دسته‌بندی — فقط از این فهرست انتخاب کن", categories),
-            ("واحد — خالی بگذاری «عدد» می‌شود", Units)
+            (new[] { "دسته‌بندی — فقط از این فهرست انتخاب کن" }, categories.Select(c => new[] { c }).ToList()),
+            (new[] { "واحد — خالی بگذاری «عدد» می‌شود" }, Units.Select(u => new[] { u }).ToList())
         });
     }
 
@@ -64,15 +63,15 @@ public static class ExcelTemplates
     {
         await using var db = await factory.CreateDbContextAsync();
 
-        var products = await db.Products
+        var items = await db.Products
             .Where(p => p.Code != null)
             .OrderBy(p => p.Name)
-            .Select(p => p.Code + " — " + p.Name)
+            .Select(p => new { p.Code, p.Name })
             .ToListAsync();
 
-        return Build("قیمت‌ها", PriceHeaders, new (string, IEnumerable<string?>)[]
+        return Build("قیمت‌ها", PriceHeaders, new (string[], IEnumerable<string[]>)[]
         {
-            ("کالاهای موجود — کد و نام", products)
+            (new[] { "کد", "نام" }, items.Select(p => new[] { p.Code, p.Name }).ToList())
         });
     }
 
@@ -80,15 +79,15 @@ public static class ExcelTemplates
     {
         await using var db = await factory.CreateDbContextAsync();
 
-        var parties = await db.Parties
+        var items = await db.Parties
             .OrderBy(p => p.Name)
-            .Select(p => p.Code + " — " + p.Name)
+            .Select(p => new { p.Code, p.Name })
             .ToListAsync();
 
-        return Build("طرف حساب‌ها", PartyHeaders, new (string, IEnumerable<string?>)[]
+        return Build("طرف حساب‌ها", PartyHeaders, new (string[], IEnumerable<string[]>)[]
         {
-            ("نوع — فقط یکی از این سه", PartyTypes),
-            ("طرف حساب‌های موجود", parties)
+            (new[] { "نوع — فقط یکی از این سه" }, PartyTypes.Select(t => new[] { t }).ToList()),
+            (new[] { "کد", "نام" }, items.Select(p => new[] { p.Code, p.Name }).ToList())
         });
     }
 
@@ -101,15 +100,15 @@ public static class ExcelTemplates
             .Select(c => c.Name)
             .ToListAsync();
 
-        return Build("دسته‌بندی‌ها", CategoryHeaders, new (string, IEnumerable<string?>)[]
+        return Build("دسته‌بندی‌ها", CategoryHeaders, new (string[], IEnumerable<string[]>)[]
         {
-            ("دسته‌های موجود — برای ستون دستهٔ مادر", names)
+            (new[] { "دسته‌های موجود — برای ستون دستهٔ مادر" }, names.Select(n => new[] { n }).ToList())
         });
     }
 
     // ================= ساخت یک‌گذری فایل =================
     private static byte[] Build(string sheetName, string[] headers,
-        IEnumerable<(string Title, IEnumerable<string?> Values)> lists)
+        IEnumerable<(string[] Titles, IEnumerable<string[]> Rows)> lists)
     {
         using var workbook = new XLWorkbook();
 
@@ -131,31 +130,33 @@ public static class ExcelTemplates
         var column = 1;
         var hasLists = false;
 
-        foreach (var (title, values) in lists)
+        foreach (var (titles, rows) in lists)
         {
             hasLists = true;
 
-            var head = listSheet.Cell(1, column);
-            head.Value = title;
-            head.Style.Font.Bold = true;
-            head.Style.Fill.BackgroundColor = XLColor.LightGray;
+            for (var i = 0; i < titles.Length; i++)
+            {
+                var head = listSheet.Cell(1, column + i);
+                head.Value = titles[i];
+                head.Style.Font.Bold = true;
+                head.Style.Fill.BackgroundColor = XLColor.LightGray;
+                listSheet.Column(column + i).Width = 26;
+            }
 
             var row = 2;
-            foreach (var value in values)
+            foreach (var values in rows)
             {
-                if (string.IsNullOrWhiteSpace(value))
+                for (var i = 0; i < titles.Length && i < values.Length; i++)
                 {
-                    continue;
+                    var cell = listSheet.Cell(row, column + i);
+                    cell.Value = values[i] ?? string.Empty;
+                    cell.Style.NumberFormat.Format = "@";
                 }
 
-                var cell = listSheet.Cell(row, column);
-                cell.Value = value;
-                cell.Style.NumberFormat.Format = "@";
                 row++;
             }
 
-            listSheet.Column(column).Width = 34;
-            column++;
+            column += titles.Length + 1;
         }
 
         if (!hasLists)
