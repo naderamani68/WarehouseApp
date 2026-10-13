@@ -51,3 +51,12 @@ STATUS.md
 TEST-PLAN.md
 نمونه-ورود-*.xlsx
 نمونه-اکسل-*.xlsx
+# verify-and-fix artifacts
+fix.py
+before.json
+after.json
+fix.json
+f1.log
+f1.err
+_closed_temp/
+bin2/
