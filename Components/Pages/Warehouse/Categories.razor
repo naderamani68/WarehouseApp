@@ -428,8 +428,15 @@
         /// <summary>دانلود فایل نمونهٔ ورود دسته‌بندی‌ها</summary>
     private async Task DownloadCategoryTemplate()
     {
-        var bytes = await WarehouseApp.Services.ExcelTemplates.CategoriesAsync(Db);
-        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-دسته‌بندیها.xlsx", Convert.ToBase64String(bytes));
+        try
+        {
+            var bytes = await WarehouseApp.Services.ExcelTemplates.CategoriesAsync(DbFactory);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-دسته‌بندیها.xlsx", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ساخت فایل نمونه: {ex.Message}");
+        }
     }
 
     /// <summary>ورود گروهی دسته‌بندی‌ها از فایل اکسل</summary>

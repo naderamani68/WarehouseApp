@@ -6,6 +6,7 @@
 @using WarehouseApp.Data
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
+@inject IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> DbFactory
 @inject AccessService Access
 @inject ExcelService Excel
 @inject ToastService Toasts
@@ -551,8 +552,15 @@ else
         /// <summary>دانلود فایل نمونهٔ ورود طرف حساب‌ها</summary>
     private async Task DownloadPartyTemplate()
     {
-        var bytes = await WarehouseApp.Services.ExcelTemplates.PartiesAsync(Db);
-        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-طرف-حسابها.xlsx", Convert.ToBase64String(bytes));
+        try
+        {
+            var bytes = await WarehouseApp.Services.ExcelTemplates.PartiesAsync(DbFactory);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-طرف-حسابها.xlsx", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ساخت فایل نمونه: {ex.Message}");
+        }
     }
 
     /// <summary>ورود گروهی طرف حساب‌ها از فایل اکسل</summary>

@@ -799,15 +799,29 @@
     /// <summary>دانلود فایل نمونهٔ ورود گروهی کالاها</summary>
     private async Task DownloadProductTemplate()
     {
-        var bytes = await WarehouseApp.Services.ExcelTemplates.ProductsAsync(Db);
-        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-کالاها.xlsx", Convert.ToBase64String(bytes));
+        try
+        {
+            var bytes = await WarehouseApp.Services.ExcelTemplates.ProductsAsync(DbFactory);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-کالاها.xlsx", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ساخت فایل نمونه: {ex.Message}");
+        }
     }
 
     /// <summary>دانلود فایل نمونهٔ ورود قیمت‌ها</summary>
     private async Task DownloadPriceTemplate()
     {
-        var bytes = await WarehouseApp.Services.ExcelTemplates.PricesAsync(Db);
-        await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-قیمت‌ها.xlsx", Convert.ToBase64String(bytes));
+        try
+        {
+            var bytes = await WarehouseApp.Services.ExcelTemplates.PricesAsync(DbFactory);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-قیمت‌ها.xlsx", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex)
+        {
+            Toasts.ShowError($"خطا در ساخت فایل نمونه: {ex.Message}");
+        }
     }
 
     private async Task ImportProducts(InputFileChangeEventArgs e)

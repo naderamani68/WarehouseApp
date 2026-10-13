@@ -48,8 +48,10 @@ public static class ExcelTemplates
         return output.ToArray();
     }
 
-    public static async Task<byte[]> ProductsAsync(WarehouseApp.Data.ApplicationDbContext db)
+    public static async Task<byte[]> ProductsAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
     {
+        await using var db = await factory.CreateDbContextAsync();
+
         var categories = await db.Categories
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
@@ -65,8 +67,10 @@ public static class ExcelTemplates
         });
     }
 
-    public static async Task<byte[]> PricesAsync(WarehouseApp.Data.ApplicationDbContext db)
+    public static async Task<byte[]> PricesAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
     {
+        await using var db = await factory.CreateDbContextAsync();
+
         var products = await db.Products
             .Where(p => p.Code != null)
             .OrderBy(p => p.Name)
@@ -79,8 +83,10 @@ public static class ExcelTemplates
         });
     }
 
-    public static async Task<byte[]> PartiesAsync(WarehouseApp.Data.ApplicationDbContext db)
+    public static async Task<byte[]> PartiesAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
     {
+        await using var db = await factory.CreateDbContextAsync();
+
         var parties = await db.Parties
             .OrderBy(p => p.Name)
             .Select(p => p.Code + " — " + p.Name)
@@ -93,8 +99,10 @@ public static class ExcelTemplates
         });
     }
 
-    public static async Task<byte[]> CategoriesAsync(WarehouseApp.Data.ApplicationDbContext db)
+    public static async Task<byte[]> CategoriesAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
     {
+        await using var db = await factory.CreateDbContextAsync();
+
         var names = await db.Categories
             .OrderBy(c => c.Name)
             .Select(c => c.Name)

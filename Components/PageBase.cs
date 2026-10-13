@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using WarehouseApp.Data;
 using WarehouseApp.Services;
@@ -24,6 +25,7 @@ public abstract class PageBase : ComponentBase
     [Inject] protected NavigationManager Nav { get; set; } = default!;
 
     [Inject] protected ApplicationDbContext Db { get; set; } = default!;
+    [Inject] protected IDbContextFactory<ApplicationDbContext> DbFactory { get; set; } = default!;
 
     /// <summary>اختیارات کاربر جاری</summary>
     protected Permissions MyPermissions { get; private set; } = Permissions.None;
