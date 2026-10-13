@@ -406,6 +406,31 @@
         {
             row.UnitName = unitById.TryGetValue(row.ProductId, out var unitName) ? unitName : "عدد";
         }
+
+        // ===== موجودی کالاهایی که هیچ حرکت انباری ندارند =====
+        // موجودی کل کالا با گزارش هم‌خوان شود؛ مابه‌التفاوت زیر «بدون انبار» می‌آید.
+        var movementTotals = stockRows
+            .GroupBy(r => r.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        foreach (var product in stockProducts)
+        {
+            var assigned = movementTotals.TryGetValue(product.Id, out var sum) ? sum : 0;
+            var unassigned = product.Quantity - assigned;
+
+            if (unassigned != 0)
+            {
+                stockRows.Add(new StockRow
+                {
+                    ProductId = product.Id,
+                    WarehouseId = 0,
+                    ProductName = product.Name ?? "—",
+                    WarehouseName = "بدون انبار",
+                    UnitName = product.UnitTitle,
+                    Quantity = unassigned
+                });
+            }
+        }
     }
 
     private List<StockRow> filteredStockRows
