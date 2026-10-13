@@ -36,8 +36,12 @@ else
             </div>
             <div class="col-md-2 d-flex align-items-center">
                 <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="roleActive" @bind="formIsActive" />
+                    <input class="form-check-input" type="checkbox" id="roleActive" @bind="formIsActive" disabled="@(editing is not null && editing.Id == WarehouseApp.Data.Role.AdminRoleId)" />
                     <label class="form-check-label" for="roleActive">فعال</label>
+                    @if (editing is not null && editing.Id == WarehouseApp.Data.Role.AdminRoleId)
+                    {
+                        <span class="text-muted small ms-2">(نقش مدیر سیستم همیشه فعال است)</span>
+                    }
                 </div>
             </div>
         </div>

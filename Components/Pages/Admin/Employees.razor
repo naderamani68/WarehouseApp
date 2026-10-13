@@ -82,7 +82,7 @@ else
 
             <div class="col-12">
                 <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="empActive" @bind="formIsActive" />
+                    <input class="form-check-input" type="checkbox" id="empActive" @bind="formIsActive" disabled="@(editing is not null && editing.RoleId == WarehouseApp.Data.Role.AdminRoleId)" />
                     <label class="form-check-label" for="empActive">
                         حساب فعال باشد
                         <span class="text-muted small">(اگر غیرفعال شود، این کارمند نمی‌تواند وارد شود)</span>
@@ -361,6 +361,12 @@ else
     {
         try
         {
+            if (e.RoleId == WarehouseApp.Data.Role.AdminRoleId)
+            {
+                Toasts.ShowError("حساب «مدیر سیستم» را نمی‌توان غیرفعال کرد");
+                return;
+            }
+
             e.IsActive = !e.IsActive;
             Db.Employees.Update(e);
             await Db.SaveChangesAsync();
