@@ -470,7 +470,7 @@
                 Toasts.ShowSuccess(note);
             }
 
-            await AuditAsync("ورود از اکسل", "دسته‌بندی", 0, result.Summary);
+            await AuditAsync("ورود دسته‌بندی‌ها از اکسل", "دسته‌بندی", 0, result.Summary);
             await LoadCategories();
         }
         catch (Exception ex)

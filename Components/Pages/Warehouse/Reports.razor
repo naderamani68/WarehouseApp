@@ -237,7 +237,7 @@
         </div>
 
         <div class="text-muted small mb-2">
-            @filteredStockRows.Count ردیف &nbsp;|&nbsp; مجموع موجودی: <strong>@filteredStockRows.Sum(r => r.Quantity)</strong> عدد
+            @filteredStockRows.Count ردیف &nbsp;|&nbsp; جمع هر واحد را جدا نشان می‌دهیم
         </div>
 
         <div style="max-height: 420px; overflow-y: auto;">
@@ -467,7 +467,7 @@
 
             var pcNow = new PersianCalendar();
             var now = DateTime.Now;
-            var title = $"موجودی کالا در انبارها  |  ردیف: {data.Count}  |  مجموع: {data.Sum(r => r.Quantity)}  |  تاریخ: {pcNow.GetYear(now):0000}/{pcNow.GetMonth(now):00}/{pcNow.GetDayOfMonth(now):00}";
+            var title = $"موجودی کالا در انبارها  |  ردیف: {data.Count}  |  ردیف: {data.Count}  |  تاریخ: {pcNow.GetYear(now):0000}/{pcNow.GetMonth(now):00}/{pcNow.GetDayOfMonth(now):00}";
 
             var bytes = Excel.Export(data, "موجودی انبارها", columns, title);
             var base64 = Convert.ToBase64String(bytes);

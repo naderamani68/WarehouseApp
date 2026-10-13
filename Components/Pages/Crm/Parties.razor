@@ -146,13 +146,13 @@ else
             {
                 <label for="partyImportFile" class="btn btn-outline-success w-100 mb-2" title="ورود گروهی طرف حساب‌ها از فایل اکسل">
                     <i class="bi bi-upload me-1"></i>
-                    ورود از اکسل
+                    ورود طرف حساب‌ها از اکسل
                 </label>
                 <InputFile id="partyImportFile" OnChange="ImportParties" accept=".xlsx,.xlsm" class="d-none" />
 
                 <button class="btn btn-outline-secondary w-100 mb-2" @onclick="DownloadPartyTemplate" title="فایل نمونهٔ ورود طرف حساب‌ها">
                     <i class="bi bi-file-earmark-arrow-down me-1"></i>
-                    نمونهٔ اکسل
+                    نمونهٔ طرف حساب‌ها
                 </button>
             }
 
@@ -594,7 +594,7 @@ else
                 Toasts.ShowSuccess(note);
             }
 
-            await AuditAsync("ورود از اکسل", "طرف حساب", 0, result.Summary);
+            await AuditAsync("ورود طرف حساب‌ها از اکسل", "طرف حساب", 0, result.Summary);
             await LoadAsync();
         }
         catch (Exception ex)

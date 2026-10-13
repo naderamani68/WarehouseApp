@@ -92,19 +92,19 @@
     <div class="col-md-4 text-end">
         <label for="productImportFile" class="btn btn-outline-success mb-0" title="ورود گروهی کالاها از فایل اکسل">
             <i class="bi bi-upload me-1"></i>
-            ورود از اکسل
+            ورود کالاها از اکسل
         </label>
         <InputFile id="productImportFile" OnChange="ImportProducts" accept=".xlsx,.xlsm" class="d-none" />
-        <label for="priceImportFile" class="btn btn-outline-success mb-0" title="ورود قیمت‌ها از فایل اکسل — ستون‌های کد و قیمت فروش و بهای خرید">
+        <label for="priceImportFile" class="btn btn-outline-success mb-0" title="ورود قیمت‌ها از اکسل از فایل اکسل — ستون‌های کد و قیمت فروش و بهای خرید">
             <span class="bi bi-cash-coin me-1" aria-hidden="true"></span>
-            ورود قیمت‌ها
+            ورود قیمت‌ها از اکسل
         </label>
         <InputFile id="priceImportFile" OnChange="ImportPrices" accept=".xlsx,.xlsm" class="d-none" />
         <button class="btn btn-outline-secondary mb-0" @onclick="DownloadProductTemplate" title="فایل نمونهٔ ورود گروهی کالاها">
             <i class="bi bi-file-earmark-arrow-down me-1"></i>
             نمونهٔ کالاها
         </button>
-        <button class="btn btn-outline-secondary mb-0" @onclick="DownloadPriceTemplate" title="فایل نمونهٔ ورود قیمت‌ها">
+        <button class="btn btn-outline-secondary mb-0" @onclick="DownloadPriceTemplate" title="فایل نمونهٔ ورود قیمت‌ها از اکسل">
             <i class="bi bi-file-earmark-arrow-down me-1"></i>
             نمونهٔ قیمت‌ها
         </button>
@@ -810,7 +810,7 @@
         }
     }
 
-    /// <summary>دانلود فایل نمونهٔ ورود قیمت‌ها</summary>
+    /// <summary>دانلود فایل نمونهٔ ورود قیمت‌ها از اکسل</summary>
     private async Task DownloadPriceTemplate()
     {
         try
@@ -945,7 +945,7 @@
             await Db.SaveChangesAsync();
             await LoadProducts();
 
-            Toasts.ShowSuccess($"ورود از اکسل انجام شد: {added} کالای تازه، {updated} کالای به‌روزشده، {skipped} ردیف بی‌نام");
+            Toasts.ShowSuccess($"ورود کالاها از اکسل انجام شد: {added} کالای تازه، {updated} کالای به‌روزشده، {skipped} ردیف بی‌نام");
         }
         catch (Exception ex)
         {
