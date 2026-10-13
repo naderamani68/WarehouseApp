@@ -104,6 +104,16 @@ public static class CrmService
         }
 
         // ===== بررسی موجودی پیش از هر تغییر =====
+        var warehouseStock = await db.StockMovements
+            .Where(m => m.WarehouseId == order.WarehouseId.Value)
+            .GroupBy(m => m.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                Quantity = g.Sum(x => x.Type == MovementType.In ? x.Quantity : -x.Quantity)
+            })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Quantity);
+
         var shortages = order.Items
             .Where(i => i.Product is not null && i.Quantity > i.Product.Quantity)
             .Select(i => $"{i.Product!.Name ?? "کالای بدون نام"} (موجودی: {i.Product.Quantity})")
@@ -115,6 +125,17 @@ public static class CrmService
         }
 
         // ===== کسر از انبار =====
+        var warehouseShortages = order.Items
+            .Where(i => i.Product is not null &&
+                i.Quantity > (warehouseStock.TryGetValue(i.ProductId, out var inWarehouse) ? inWarehouse : 0))
+            .Select(i => $"{i.Product!.Name ?? "کالای بدون نام"} (در این انبار: {(warehouseStock.TryGetValue(i.ProductId, out var inWarehouse) ? inWarehouse : 0)})")
+            .ToList();
+
+        if (warehouseShortages.Count > 0)
+        {
+            return (false, "در انبار انتخاب‌شده موجودی کافی نیست: " + string.Join("، ", warehouseShortages) + " — انبار دیگری را انتخاب کن");
+        }
+
         foreach (var item in order.Items)
         {
             var product = await db.Products.FirstAsync(p => p.Id == item.ProductId);

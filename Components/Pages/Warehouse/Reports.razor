@@ -237,7 +237,11 @@
         </div>
 
         <div class="text-muted small mb-2">
-            @filteredStockRows.Count ردیف &nbsp;|&nbsp; جمع هر واحد را جدا نشان می‌دهیم
+            @filteredStockRows.Count ردیف &nbsp;|&nbsp;
+            @foreach (var unitGroup in filteredStockRows.GroupBy(r => r.UnitName))
+            {
+                <span class="badge bg-secondary me-1">@unitGroup.Sum(x => x.Quantity) @unitGroup.Key</span>
+            }
         </div>
 
         <div style="max-height: 420px; overflow-y: auto;">
@@ -246,6 +250,7 @@
                     <tr>
                         <th>کالا</th>
                         <th>انبار</th>
+                        <th style="width: 100px;">واحد</th>
                         <th style="width: 120px;">موجودی</th>
                     </tr>
                 </thead>
@@ -263,6 +268,7 @@
                             <tr>
                                 <td>@r.ProductName</td>
                                 <td>@r.WarehouseName</td>
+                                <td class="text-muted">@r.UnitName</td>
                                 <td>
                                     @if (r.Quantity == 0)
                                     {
@@ -393,6 +399,13 @@
                 Quantity = x.Quantity
             })
             .ToList();
+
+        var unitById = stockProducts.ToDictionary(p => p.Id, p => p.UnitTitle);
+
+        foreach (var row in stockRows)
+        {
+            row.UnitName = unitById.TryGetValue(row.ProductId, out var unitName) ? unitName : "عدد";
+        }
     }
 
     private List<StockRow> filteredStockRows
@@ -462,12 +475,13 @@
             {
                 ["کالا"] = r => r.ProductName,
                 ["انبار"] = r => r.WarehouseName,
+                ["واحد"] = r => r.UnitName,
                 ["موجودی"] = r => r.Quantity
             };
 
             var pcNow = new PersianCalendar();
             var now = DateTime.Now;
-            var title = $"موجودی کالا در انبارها  |  ردیف: {data.Count}  |  ردیف: {data.Count}  |  تاریخ: {pcNow.GetYear(now):0000}/{pcNow.GetMonth(now):00}/{pcNow.GetDayOfMonth(now):00}";
+            var title = $"موجودی کالا در انبارها  |  ردیف: {data.Count}  |  تاریخ: {pcNow.GetYear(now):0000}/{pcNow.GetMonth(now):00}/{pcNow.GetDayOfMonth(now):00}";
 
             var bytes = Excel.Export(data, "موجودی انبارها", columns, title);
             var base64 = Convert.ToBase64String(bytes);
@@ -493,6 +507,7 @@
         public int WarehouseId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string WarehouseName { get; set; } = string.Empty;
+        public string UnitName { get; set; } = string.Empty;
         public int Quantity { get; set; }
     }
 
