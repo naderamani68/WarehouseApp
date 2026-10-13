@@ -143,10 +143,7 @@ public static class ShopEndpoints
                 party.Address = customerAddress;
             }
 
-            var warehouseId = await db.Warehouses
-                .OrderBy(w => w.Id)
-                .Select(w => (int?)w.Id)
-                .FirstOrDefaultAsync();
+            // انبار پس از مشخص‌شدن اقلام انتخاب می‌شود (پایین‌تر) تا از انباری که موجودی دارد کسر شود.
 
             var shopChannelId = await db.SalesChannels
                 .Where(c => c.Name == "فروشگاه اینترنتی")
@@ -159,7 +156,7 @@ public static class ShopEndpoints
             {
                 OrderNumber = "TEMP",
                 PartyId = party.Id,
-                WarehouseId = warehouseId,
+
                 OrderDate = DateTime.Now,
                 CreatedAt = DateTime.Now,
                 Status = OrderStatus.Draft,
@@ -198,6 +195,28 @@ public static class ShopEndpoints
             {
                 return Results.Redirect("/shop/cart?error=stock");
             }
+
+            // ===== انتخاب انبار خروج: انباری که برای این اقلام موجودی دارد =====
+            var orderedProductIds = order.Items.Select(i => i.ProductId).ToList();
+            var stockByWarehouse = await db.StockMovements
+                .Where(m => orderedProductIds.Contains(m.ProductId))
+                .GroupBy(m => new { m.ProductId, m.WarehouseId })
+                .Select(g => new
+                {
+                    g.Key.WarehouseId,
+                    Available = g.Sum(x => x.Type == WarehouseApp.Data.MovementType.In ? x.Quantity : -x.Quantity)
+                })
+                .ToListAsync();
+
+            var bestWarehouse = stockByWarehouse
+                .GroupBy(x => x.WarehouseId)
+                .Select(g => new { WarehouseId = g.Key, Score = g.Sum(x => x.Available) })
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            order.WarehouseId = bestWarehouse is not null && bestWarehouse.Score > 0
+                ? bestWarehouse.WarehouseId
+                : await db.Warehouses.OrderBy(w => w.Id).Select(w => (int?)w.Id).FirstOrDefaultAsync();
 
             db.SalesOrders.Add(order);
             await db.SaveChangesAsync();
