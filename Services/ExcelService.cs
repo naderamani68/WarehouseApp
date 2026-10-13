@@ -16,7 +16,15 @@ public class ExcelService
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "WarehouseApp", "import");
 
-        Directory.CreateDirectory(folder);
+        try
+        {
+            Directory.CreateDirectory(folder);
+        }
+        catch
+        {
+            folder = Path.Combine(AppContext.BaseDirectory, "import");
+            Directory.CreateDirectory(folder);
+        }
 
         foreach (var old in Directory.GetFiles(folder, "import-*.xlsx"))
         {

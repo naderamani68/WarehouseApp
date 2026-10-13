@@ -33,6 +33,43 @@ builder.Services.AddRazorComponents()
 // کارخانهٔ ساخت زمینهٔ پایگاه داده.
 // چون چیدمان (منو) و صفحه هم‌زمان رندر می‌شوند، هر عملیات باید زمینهٔ مستقل خودش را
 // داشته باشد؛ در غیر این صورت خطای «دو عملیات هم‌زمان روی یک اتصال» رخ می‌دهد.
+// ===== پوشهٔ موقت اختصاصی برنامه =====
+// چرا؟ ClosedXML برای خواندن یا ساختن فایل اکسل، در پوشهٔ موقت ویندوز فایل موقت می‌سازد
+// و روی بعضی سیستم‌ها (آنتی‌ویروس یا سطح دسترسی) نوشتن در آن پوشه رد می‌شود.
+// پس پوشهٔ موقت را به جایی می‌بریم که خودمان مطمئنیم قابل نوشتن است.
+try
+{
+    var tempCandidates = new[]
+    {
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WarehouseApp", "temp"),
+        Path.Combine(AppContext.BaseDirectory, "temp"),
+        Path.Combine(Directory.GetCurrentDirectory(), "temp")
+    };
+
+    foreach (var tempCandidate in tempCandidates)
+    {
+        try
+        {
+            Directory.CreateDirectory(tempCandidate);
+
+            var probe = Path.Combine(tempCandidate, "probe.tmp");
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+
+            Environment.SetEnvironmentVariable("TEMP", tempCandidate);
+            Environment.SetEnvironmentVariable("TMP", tempCandidate);
+            break;
+        }
+        catch
+        {
+            // پوشهٔ بعدی را امتحان کن
+        }
+    }
+}
+catch
+{
+    // هیچ‌کدام نشد — به پوشهٔ موقت خود ویندوز دست نمی‌زنیم
+}
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
