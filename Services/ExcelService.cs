@@ -5,6 +5,22 @@ namespace WarehouseApp.Services;
 
 public class ExcelService
 {
+    /// <summary>
+    /// فایل بارگذاری‌شدهٔ مرورگر را به‌صورت ناهم‌زمان در حافظه می‌خواند.
+    /// چرا؟ جریان فایل مرورگر «خواندن هم‌زمان» را پشتیبانی نمی‌کند و کتابخانهٔ اکسل هم‌زمان می‌خواند.
+    /// </summary>
+    public static async Task<MemoryStream> CopyUploadAsync(Stream source)
+    {
+        var buffer = new MemoryStream();
+
+        await using (source)
+        {
+            await source.CopyToAsync(buffer);
+        }
+
+        buffer.Position = 0;
+        return buffer;
+    }
     private static readonly PersianCalendar _pc = new();
 
     // فونت پیشنهادی برای نمایش صحیح فارسی
