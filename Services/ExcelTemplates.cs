@@ -1,26 +1,141 @@
-﻿using Microsoft.EntityFrameworkCore;
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
+using WarehouseApp.Data;
+
 namespace WarehouseApp.Services;
 
 /// <summary>
-/// فایل‌های نمونهٔ اکسل برای وارد کردن داده.
-/// عنوان ستون‌ها دقیقاً همان چیزی است که صفحهٔ کالاها می‌خواند،
-/// پس فایل ساخته‌شده بدون تغییر هم قابل استفاده است.
+/// قالب‌های اکسل ورود داده.
+/// هر قالب در «یک گذر» ساخته می‌شود: برگهٔ داده + برگهٔ «فهرست‌ها» با دادهٔ واقعی سیستم.
+/// چرا یک‌گذری؟ چون بازکردن دوبارهٔ فایل ساخته‌شده، OpenXml را وادار به ساختن فایل موقت
+/// در پوشهٔ Temp می‌کند و روی بعضی سیستم‌ها دسترسی به آن پوشه بسته است.
 /// </summary>
 public static class ExcelTemplates
 {
-    /// <summary>برگهٔ دوم: فهرست‌های پویا از روی دادهٔ خود سیستم</summary>
-    private static byte[] WithLists(byte[] file, IEnumerable<(string Title, IEnumerable<string?> Values)> lists)
-    {
-        using var input = new MemoryStream(file);
-        using var workbook = new XLWorkbook(input);
+    private static readonly string[] ProductHeaders =
+        { "کد کالا", "نام کالا", "واحد", "قیمت فروش", "بهای خرید", "موجودی", "حد سفارش", "دسته‌بندی" };
 
-        var sheet = workbook.Worksheets.Add("فهرست‌ها");
+    private static readonly string[] PriceHeaders =
+        { "کد کالا", "نام کالا", "قیمت فروش", "بهای خرید" };
+
+    private static readonly string[] PartyHeaders =
+        { "کد", "نام", "نوع", "شخص رابط", "تلفن", "موبایل", "ایمیل", "کد ملی", "کد اقتصادی", "شهر", "نشانی", "کد پستی", "یادداشت" };
+
+    private static readonly string[] CategoryHeaders =
+        { "نام دسته", "دستهٔ مادر", "توضیح" };
+
+    private static readonly string?[] Units =
+        { "عدد", "کارتن", "کیلوگرم", "لیتر", "بسته", "جعبه", "متر", "خدمت" };
+
+    private static readonly string?[] PartyTypes =
+        { "مشتری", "تأمین‌کننده", "هر دو" };
+
+    private static readonly (string Title, IEnumerable<string?> Values)[] NoLists =
+        Array.Empty<(string, IEnumerable<string?>)>();
+
+    // ================= قالب‌های پایه (بدون فهرست) =================
+    public static byte[] Products() => Build("کالاها", ProductHeaders, NoLists);
+
+    public static byte[] Prices() => Build("قیمت‌ها", PriceHeaders, NoLists);
+
+    public static byte[] Parties() => Build("طرف حساب‌ها", PartyHeaders, NoLists);
+
+    public static byte[] Categories() => Build("دسته‌بندی‌ها", CategoryHeaders, NoLists);
+
+    // ================= قالب‌های پویا (با فهرست سیستم) =================
+    public static async Task<byte[]> ProductsAsync(IDbContextFactory<ApplicationDbContext> factory)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+
+        var categories = await db.Categories
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .Select(c => c.Name)
+            .ToListAsync();
+
+        return Build("کالاها", ProductHeaders, new (string, IEnumerable<string?>)[]
+        {
+            ("دسته‌بندی — فقط از این فهرست انتخاب کن", categories),
+            ("واحد — خالی بگذاری «عدد» می‌شود", Units)
+        });
+    }
+
+    public static async Task<byte[]> PricesAsync(IDbContextFactory<ApplicationDbContext> factory)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+
+        var products = await db.Products
+            .Where(p => p.Code != null)
+            .OrderBy(p => p.Name)
+            .Select(p => p.Code + " — " + p.Name)
+            .ToListAsync();
+
+        return Build("قیمت‌ها", PriceHeaders, new (string, IEnumerable<string?>)[]
+        {
+            ("کالاهای موجود — کد و نام", products)
+        });
+    }
+
+    public static async Task<byte[]> PartiesAsync(IDbContextFactory<ApplicationDbContext> factory)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+
+        var parties = await db.Parties
+            .OrderBy(p => p.Name)
+            .Select(p => p.Code + " — " + p.Name)
+            .ToListAsync();
+
+        return Build("طرف حساب‌ها", PartyHeaders, new (string, IEnumerable<string?>)[]
+        {
+            ("نوع — فقط یکی از این سه", PartyTypes),
+            ("طرف حساب‌های موجود", parties)
+        });
+    }
+
+    public static async Task<byte[]> CategoriesAsync(IDbContextFactory<ApplicationDbContext> factory)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+
+        var names = await db.Categories
+            .OrderBy(c => c.Name)
+            .Select(c => c.Name)
+            .ToListAsync();
+
+        return Build("دسته‌بندی‌ها", CategoryHeaders, new (string, IEnumerable<string?>)[]
+        {
+            ("دسته‌های موجود — برای ستون دستهٔ مادر", names)
+        });
+    }
+
+    // ================= ساخت یک‌گذری فایل =================
+    private static byte[] Build(string sheetName, string[] headers,
+        IEnumerable<(string Title, IEnumerable<string?> Values)> lists)
+    {
+        using var workbook = new XLWorkbook();
+
+        var sheet = workbook.Worksheets.Add(sheetName);
+
+        for (var i = 0; i < headers.Length; i++)
+        {
+            var cell = sheet.Cell(1, i + 1);
+            cell.Value = headers[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.LightGray;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            sheet.Column(i + 1).Width = Math.Max(14, headers[i].Length + 6);
+        }
+
+        sheet.SheetView.FreezeRows(1);
+
+        var listSheet = workbook.Worksheets.Add("فهرست‌ها");
         var column = 1;
+        var hasLists = false;
 
         foreach (var (title, values) in lists)
         {
-            var head = sheet.Cell(1, column);
+            hasLists = true;
+
+            var head = listSheet.Cell(1, column);
             head.Value = title;
             head.Style.Font.Bold = true;
             head.Style.Fill.BackgroundColor = XLColor.LightGray;
@@ -33,160 +148,23 @@ public static class ExcelTemplates
                     continue;
                 }
 
-                var cell = sheet.Cell(row, column);
+                var cell = listSheet.Cell(row, column);
                 cell.Value = value;
                 cell.Style.NumberFormat.Format = "@";
                 row++;
             }
 
-            sheet.Column(column).Width = 34;
+            listSheet.Column(column).Width = 34;
             column++;
+        }
+
+        if (!hasLists)
+        {
+            workbook.Worksheets.Delete("فهرست‌ها");
         }
 
         using var output = new MemoryStream();
         workbook.SaveAs(output);
         return output.ToArray();
-    }
-
-    public static async Task<byte[]> ProductsAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
-    {
-        await using var db = await factory.CreateDbContextAsync();
-
-        var categories = await db.Categories
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.Name)
-            .Select(c => c.Name)
-            .ToListAsync();
-
-        var units = new[] { "عدد", "کارتن", "کیلوگرم", "لیتر", "بسته", "جعبه", "متر", "خدمت" };
-
-        return WithLists(Products(), new (string, IEnumerable<string?>)[]
-        {
-            ("دسته‌بندی — فقط از این فهرست انتخاب کن", categories),
-            ("واحد — خالی بگذاری «عدد» می‌شود", units)
-        });
-    }
-
-    public static async Task<byte[]> PricesAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
-    {
-        await using var db = await factory.CreateDbContextAsync();
-
-        var products = await db.Products
-            .Where(p => p.Code != null)
-            .OrderBy(p => p.Name)
-            .Select(p => p.Code + " — " + p.Name)
-            .ToListAsync();
-
-        return WithLists(Prices(), new (string, IEnumerable<string?>)[]
-        {
-            ("کالاهای موجود — کد و نام", products)
-        });
-    }
-
-    public static async Task<byte[]> PartiesAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
-    {
-        await using var db = await factory.CreateDbContextAsync();
-
-        var parties = await db.Parties
-            .OrderBy(p => p.Name)
-            .Select(p => p.Code + " — " + p.Name)
-            .ToListAsync();
-
-        return WithLists(Parties(), new (string, IEnumerable<string?>)[]
-        {
-            ("نوع — فقط یکی از این سه", new[] { "مشتری", "تأمین‌کننده", "هر دو" }),
-            ("طرف حساب‌های موجود", parties)
-        });
-    }
-
-    public static async Task<byte[]> CategoriesAsync(IDbContextFactory<WarehouseApp.Data.ApplicationDbContext> factory)
-    {
-        await using var db = await factory.CreateDbContextAsync();
-
-        var names = await db.Categories
-            .OrderBy(c => c.Name)
-            .Select(c => c.Name)
-            .ToListAsync();
-
-        return WithLists(Categories(), new (string, IEnumerable<string?>)[]
-        {
-            ("دسته‌های موجود — برای ستون دستهٔ مادر", names)
-        });
-    }
-    /// <summary>
-    /// نمونهٔ ورود گروهی کالاها.
-    /// ترتیب ستون‌ها مهم است: کد، نام، واحد، قیمت فروش، بهای خرید، موجودی، حد سفارش، دسته‌بندی.
-    /// </summary>
-    public static byte[] Products()
-    {
-        var columns = new Dictionary<string, Func<object?, object?>>
-        {
-            ["کد کالا"] = _ => null,
-            ["نام کالا"] = _ => null,
-            ["واحد"] = _ => null,
-            ["قیمت فروش"] = _ => null,
-            ["بهای خرید"] = _ => null,
-            ["موجودی"] = _ => null,
-            ["حد سفارش"] = _ => null,
-            ["دسته‌بندی"] = _ => null
-        };
-
-        return new ExcelService().Export(Array.Empty<object?>(), "کالاها", columns);
-    }
-
-    /// <summary>
-    /// نمونهٔ ورود طرف حساب‌ها.
-    /// ترتیب: کد، نام، نوع، شخص رابط، تلفن، موبایل، ایمیل، کد ملی، کد اقتصادی، شهر، نشانی، کد پستی، یادداشت.
-    /// </summary>
-    public static byte[] Parties()
-    {
-        var columns = new Dictionary<string, Func<object?, object?>>
-        {
-            ["کد"] = _ => null,
-            ["نام"] = _ => null,
-            ["نوع"] = _ => null,
-            ["شخص رابط"] = _ => null,
-            ["تلفن"] = _ => null,
-            ["موبایل"] = _ => null,
-            ["ایمیل"] = _ => null,
-            ["کد ملی"] = _ => null,
-            ["کد اقتصادی"] = _ => null,
-            ["شهر"] = _ => null,
-            ["نشانی"] = _ => null,
-            ["کد پستی"] = _ => null,
-            ["یادداشت"] = _ => null
-        };
-
-        return new ExcelService().Export(Array.Empty<object?>(), "طرف حساب‌ها", columns);
-    }
-
-    /// <summary>نمونهٔ ورود دسته‌بندی‌ها — ترتیب: نام دسته، دستهٔ مادر، توضیح</summary>
-    public static byte[] Categories()
-    {
-        var columns = new Dictionary<string, Func<object?, object?>>
-        {
-            ["نام دسته"] = _ => null,
-            ["دستهٔ مادر"] = _ => null,
-            ["توضیح"] = _ => null
-        };
-
-        return new ExcelService().Export(Array.Empty<object?>(), "دسته‌بندی‌ها", columns);
-    }
-
-    /// <summary>
-    /// نمونهٔ ورود قیمت‌ها.
-    /// شناسایی با عنوان ستون انجام می‌شود، پس ترتیب مهم نیست.
-    /// </summary>
-    public static byte[] Prices()
-    {
-        var columns = new Dictionary<string, Func<object?, object?>>
-        {
-            ["کد کالا"] = _ => null,
-            ["نام کالا"] = _ => null,
-            ["قیمت فروش"] = _ => null,
-            ["بهای خرید"] = _ => null
-        };
-
-        return new ExcelService().Export(Array.Empty<object?>(), "قیمت‌ها", columns);
     }
 }
