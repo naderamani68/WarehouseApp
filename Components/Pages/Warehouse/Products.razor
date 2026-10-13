@@ -152,10 +152,16 @@
             {
                 @foreach (var product in pagedProducts)
                 {
-                    <tr class="@(product.IsOutOfStock ? "table-danger" : product.IsLow ? "table-warning" : "")">
+                    <tr class="@(product.IsOutOfStock ? "table-danger" : product.IsLow ? "table-warning" : productsWithoutWarehouse.Contains(product.Id) ? "table-info" : "")">
                         <td class="small" dir="ltr">@(string.IsNullOrWhiteSpace(product.Code) ? product.Id.ToString() : product.Code)</td>
                         <td>
-                            <div>@product.Name</div>
+                            <div>
+                                @product.Name
+                                @if (productsWithoutWarehouse.Contains(product.Id))
+                                {
+                                    <span class="badge bg-info text-dark" title="موجودی این کالا در هیچ انباری ثبت نشده است">⚠ بدون انبار</span>
+                                }
+                            </div>
                             @if (!product.IsActive)
                             {
                                 <span class="badge bg-secondary">غیرفعال</span>
@@ -368,6 +374,9 @@
     private static readonly CultureInfo Fa = CultureInfo.GetCultureInfo("fa-IR");
 
     private List<Product> products = new();
+
+    /// <summary>کالاهایی که موجودی‌شان در هیچ انباری ثبت نشده است</summary>
+    private HashSet<int> productsWithoutWarehouse = new();
     private List<Category> categories = new();
     private Product? editingProduct = null;
 
@@ -445,6 +454,21 @@
             .Include(p => p.Category)
             .OrderBy(p => p.Id)
             .ToListAsync();
+
+        // ===== کالاهایی که موجودی‌شان در هیچ انباری ثبت نشده =====
+        var assignedByProduct = await Db.StockMovements
+            .GroupBy(m => m.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                Quantity = g.Sum(x => x.Type == MovementType.In ? x.Quantity : -x.Quantity)
+            })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Quantity);
+
+        productsWithoutWarehouse = products
+            .Where(p => p.Quantity - (assignedByProduct.TryGetValue(p.Id, out var assigned) ? assigned : 0) != 0)
+            .Select(p => p.Id)
+            .ToHashSet();
 
         _maxQuantity = products.Any() ? products.Max(p => p.Quantity) : 1;
         if (_maxQuantity < 1) _maxQuantity = 1;
