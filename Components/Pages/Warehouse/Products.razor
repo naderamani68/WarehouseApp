@@ -840,7 +840,7 @@
         try
         {
             using var stream = e.File.OpenReadStream(5 * 1024 * 1024);
-            using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
+            using var workbook = new ClosedXML.Excel.XLWorkbook(WarehouseApp.Services.ExcelService.StageImportFile(stream));
             var sheet = workbook.Worksheets.FirstOrDefault();
 
             if (sheet is null)
@@ -984,7 +984,7 @@
         try
         {
             using var stream = e.File.OpenReadStream(20 * 1024 * 1024);
-            using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
+            using var workbook = new ClosedXML.Excel.XLWorkbook(WarehouseApp.Services.ExcelService.StageImportFile(stream));
 
             var sheet = workbook.Worksheets.FirstOrDefault();
 
