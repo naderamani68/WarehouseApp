@@ -217,6 +217,7 @@
                 <label class="form-label small mb-1">انبار</label>
                 <select class="form-select form-select-sm" @bind="stockWarehouseFilter">
                     <option value="0">— همهٔ انبارها —</option>
+                    <option value="-1">— بدون انبار —</option>
                     @foreach (var w in stockWarehouses)
                     {
                         <option value="@w.Id">@w.Name</option>
@@ -244,6 +245,36 @@
             }
         </div>
 
+        @if (transferSource is not null)
+        {
+            <div class="alert alert-info py-2 px-3 mb-2">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4 small">
+                        انتقال <strong>@transferSource.ProductName</strong>
+                        از <strong>@(transferSource.WarehouseId < 0 ? "بدون انبار" : transferSource.WarehouseName)</strong>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">به انبار</label>
+                        <select class="form-select form-select-sm" @bind="transferToId">
+                            <option value="0">— انتخاب کن —</option>
+                            @foreach (var w in stockWarehouses.Where(x => x.Id != transferSource.WarehouseId))
+                            {
+                                <option value="@w.Id">@w.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">مقدار (@transferSource.UnitName)</label>
+                        <input class="form-control form-control-sm" dir="ltr" @bind="transferQty" />
+                    </div>
+                    <div class="col-md-3 d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" @onclick="DoTransferAsync" disabled="@transferBusy">تأیید انتقال</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => transferSource = null">لغو</button>
+                    </div>
+                </div>
+            </div>
+        }
+
         <div style="max-height: 420px; overflow-y: auto;">
             <table class="table table-sm table-striped mb-0">
                 <thead class="table-light" style="position: sticky; top: 0;">
@@ -252,13 +283,14 @@
                         <th>انبار</th>
                         <th style="width: 100px;">واحد</th>
                         <th style="width: 120px;">موجودی</th>
+                        <th style="width: 90px;">انتقال</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (filteredStockRows.Count == 0)
                     {
                         <tr>
-                            <td colspan="3" class="text-center text-muted">ردیفی با این فیلترها پیدا نشد</td>
+                            <td colspan="5" class="text-center text-muted">ردیفی با این فیلترها پیدا نشد</td>
                         </tr>
                     }
                     else
@@ -267,7 +299,16 @@
                         {
                             <tr>
                                 <td>@r.ProductName</td>
-                                <td>@r.WarehouseName</td>
+                                <td>
+                                    @if (r.WarehouseId < 0)
+                                    {
+                                        <span class="badge bg-warning text-dark">بدون انبار</span>
+                                    }
+                                    else
+                                    {
+                                        @r.WarehouseName
+                                    }
+                                </td>
                                 <td class="text-muted">@r.UnitName</td>
                                 <td>
                                     @if (r.Quantity == 0)
@@ -278,6 +319,9 @@
                                     {
                                         <strong>@r.Quantity</strong>
                                     }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => StartTransfer(r)">انتقال</button>
                                 </td>
                             </tr>
                         }
@@ -301,6 +345,110 @@
 
     // ===== موجودی کالا در انبارها =====
     private List<StockRow> stockRows = new();
+
+    // ===== انتقال بین انبارها =====
+    private StockRow? transferSource;
+    private int transferToId;
+    private string transferQty = string.Empty;
+    private bool transferBusy;
+
+    /// <summary>بارگذاری دوبارهٔ موجودی انبارها پس از انتقال</summary>
+    private async Task ReloadStockAsync()
+    {
+        stockProducts = await Db.Products.OrderBy(p => p.Name).ToListAsync();
+        stockWarehouses = await Db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync();
+
+        var stockGrouped = await Db.StockMovements
+            .GroupBy(m => new { m.ProductId, m.WarehouseId })
+            .Select(g => new
+            {
+                g.Key.ProductId,
+                g.Key.WarehouseId,
+                ProductName = g.First().Product!.Name ?? "—",
+                WarehouseName = g.First().Warehouse!.Name ?? "—",
+                Quantity = g.Sum(x => x.Type == MovementType.In ? x.Quantity : -x.Quantity)
+            })
+            .ToListAsync();
+
+        stockRows = stockGrouped
+            .Select(x => new StockRow
+            {
+                ProductId = x.ProductId,
+                WarehouseId = x.WarehouseId,
+                ProductName = x.ProductName,
+                WarehouseName = x.WarehouseName,
+                Quantity = x.Quantity
+            })
+            .ToList();
+
+        var unitById = stockProducts.ToDictionary(p => p.Id, p => p.UnitTitle);
+
+        foreach (var row in stockRows)
+        {
+            row.UnitName = unitById.TryGetValue(row.ProductId, out var unitName) ? unitName : "عدد";
+        }
+
+        var movementTotals = stockRows.GroupBy(r => r.ProductId).ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        foreach (var product in stockProducts)
+        {
+            var assigned = movementTotals.TryGetValue(product.Id, out var sum) ? sum : 0;
+            var unassigned = product.Quantity - assigned;
+
+            if (unassigned != 0)
+            {
+                stockRows.Add(new StockRow
+                {
+                    ProductId = product.Id,
+                    WarehouseId = -1,
+                    ProductName = product.Name ?? "—",
+                    WarehouseName = "بدون انبار",
+                    UnitName = product.UnitTitle,
+                    Quantity = unassigned
+                });
+            }
+        }
+    }
+
+    private void StartTransfer(StockRow row)
+    {
+        transferSource = row;
+        transferToId = 0;
+        transferQty = row.Quantity > 0 ? row.Quantity.ToString() : string.Empty;
+    }
+
+    private async Task DoTransferAsync()
+    {
+        if (transferSource is null)
+        {
+            return;
+        }
+
+        try
+        {
+            transferBusy = true;
+
+            var quantity = (int)(WarehouseApp.Services.SettingsService.ParseDecimal(transferQty) ?? 0);
+            var result = await WarehouseApp.Services.StockService.TransferAsync(
+                Db, transferSource.ProductId, transferSource.WarehouseId, transferToId, quantity);
+
+            if (result.Ok)
+            {
+                Toasts.ShowSuccess(result.Message);
+                await AuditAsync("انتقال", "موجودی انبار", transferSource.ProductId, result.Message);
+                transferSource = null;
+                await ReloadStockAsync();
+            }
+            else
+            {
+                Toasts.ShowError(result.Message);
+            }
+        }
+        finally
+        {
+            transferBusy = false;
+        }
+    }
     private List<Product> stockProducts = new();
     private List<Warehouse> stockWarehouses = new();
     private int stockProductFilter;
@@ -423,7 +571,7 @@
                 stockRows.Add(new StockRow
                 {
                     ProductId = product.Id,
-                    WarehouseId = 0,
+                    WarehouseId = -1,
                     ProductName = product.Name ?? "—",
                     WarehouseName = "بدون انبار",
                     UnitName = product.UnitTitle,
