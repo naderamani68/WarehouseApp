@@ -1514,3 +1514,140 @@ a.user-box:hover {
         margin-bottom: 1rem;
     }
 }
+/* ================= بازطراحی منوی کناری فروشگاه ================= */
+.shop-side {
+    position: sticky;
+    top: 1rem;
+    background: var(--bs-body-bg);
+    border: 1px solid rgba(0, 0, 0, .08);
+    border-radius: 18px;
+    padding: 1rem .8rem 1.2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .07);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.shop-nav-head {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    font-size: 1.08rem;
+    font-weight: 800;
+    padding: .3rem .6rem .85rem;
+    margin-bottom: .7rem;
+    border-bottom: 2px solid rgba(13, 110, 253, .18);
+}
+
+.shop-side .shop-tree-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    min-height: 48px;
+    padding: .65rem .85rem;
+    margin-bottom: .4rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--bs-body-color);
+    text-decoration: none;
+    border: 1px solid transparent;
+}
+
+.shop-side .shop-tree-link:hover {
+    background: rgba(13, 110, 253, .09);
+    border-color: rgba(13, 110, 253, .28);
+}
+
+.shop-side .shop-tree-link.active {
+    background: rgba(13, 110, 253, .13);
+    border-color: rgba(13, 110, 253, .38);
+    border-right: 4px solid var(--bs-primary);
+    color: var(--bs-primary);
+    font-weight: 800;
+}
+
+.shop-side .shop-tree-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.3rem;
+    padding: .15rem .6rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .07);
+    font-size: .85rem;
+    font-weight: 700;
+}
+
+.shop-side .shop-tree-link.active .shop-tree-count {
+    background: rgba(13, 110, 253, .2);
+    color: var(--bs-primary);
+}
+
+.shop-side .shop-tree-group {
+    margin-bottom: .4rem;
+}
+
+.shop-side .shop-tree-group > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px;
+    padding: .65rem .85rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.shop-side .shop-tree-group > summary:hover {
+    background: rgba(0, 0, 0, .055);
+}
+
+.shop-side .shop-tree-group > summary::after {
+    content: "▾";
+    font-size: 1rem;
+    opacity: .7;
+}
+
+.shop-side .shop-tree-group[open] > summary::after {
+    transform: rotate(180deg);
+}
+
+.shop-side .shop-tree-group > div .shop-tree-link {
+    margin-right: .95rem;
+    min-height: 42px;
+    font-size: .95rem;
+    font-weight: 500;
+}
+
+.shop-side .shop-subcats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.shop-side .shop-subcat {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .5rem .95rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .055);
+    font-size: .95rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--bs-body-color);
+}
+
+.shop-side .shop-subcat:hover {
+    background: rgba(13, 110, 253, .12);
+}
+
+@media (max-width: 991.98px) {
+    .shop-side {
+        position: static;
+        max-height: none;
+    }
+}

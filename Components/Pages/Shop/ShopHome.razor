@@ -20,13 +20,16 @@
         @* ===== نوار کناری: درخت دسته‌بندی ===== *@
         <div class="col-lg-3">
             <aside class="shop-side">
-                <div class="shop-side-title">
-                    <span class="bi bi-diagram-3" aria-hidden="true"></span>
-                    دسته‌بندی کالاها
+                <div class="shop-side-title shop-nav-head">
+                    <span class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></span>
+                    <span>دسته‌بندی کالاها</span>
                 </div>
 
                 <a href="/shop" class="shop-tree-link @(selected is null && string.IsNullOrWhiteSpace(search) ? "active" : "")">
-                    <span>همهٔ کالاها</span>
+                    <span class="d-inline-flex align-items-center gap-2">
+                        <span class="bi bi-house-door" aria-hidden="true"></span>
+                        <span>همهٔ کالاها</span>
+                    </span>
                     <span class="shop-tree-count">@Num(AllCount)</span>
                 </a>
 
