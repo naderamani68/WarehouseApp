@@ -39,6 +39,7 @@ public enum OrderSource
 /// </summary>
 public class SalesOrder
 {
+        public decimal VatPercent { get; set; }
     public int Id { get; set; }
 
     /// <summary>شمارهٔ سفارش (یکتا) — مثل SO-1405-0001</summary>

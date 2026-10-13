@@ -1001,6 +1001,9 @@ namespace WarehouseApp.Migrations
                     b.Property<string>("Username")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("VatPercent")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int?>("WarehouseId")
                         .HasColumnType("int");
 

@@ -156,7 +156,7 @@
                             @if (VatAmount > 0)
                             {
                                 <tr>
-                                    <td class="text-muted">مالیات بر ارزش افزوده (@vatPercent.ToString("N0", Fa)٪)</td>
+                                    <td class="text-muted">مالیات بر ارزش افزوده (@((order?.VatPercent ?? 0m).ToString("N0", Fa))٪)</td>
                                     <td class="text-end">@Money(VatAmount)</td>
                                 </tr>
                             }
@@ -213,7 +213,7 @@
 
     private decimal TotalDiscount => order?.Items.Sum(i => (i.UnitPrice * i.Quantity) - i.LineTotal) ?? 0;
 
-    private decimal VatAmount => vatEnabled ? Math.Round(SubTotal * vatPercent / 100m) : 0;
+    private decimal VatAmount => Math.Round(SubTotal * (order?.VatPercent ?? 0m) / 100m);
 
     private decimal Payable => SubTotal + VatAmount;
 

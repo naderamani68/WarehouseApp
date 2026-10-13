@@ -632,6 +632,9 @@ else
 
             foreach (var line in valid)
             {
+                order.VatPercent = await WarehouseApp.Services.SettingsService.VatEnabledAsync(Db)
+                    ? await WarehouseApp.Services.SettingsService.VatPercentAsync(Db)
+                    : 0m;
                 order.Items.Add(new SalesOrderItem
                 {
                     ProductId = line.ProductId,

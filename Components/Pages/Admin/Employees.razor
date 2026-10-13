@@ -164,7 +164,7 @@ else
                         <td>
                             <button type="button" class="btn btn-sm btn-warning" @onclick="() => StartEdit(e)">ویرایش</button>
                             <button type="button" class="btn btn-sm @(e.IsActive ? "btn-outline-danger" : "btn-outline-success")"
-                                    @onclick="() => ToggleActiveAsync(e)">
+                                    @onclick="() => ToggleActiveAsync(e)" hidden="@(e.RoleId == WarehouseApp.Data.Role.AdminRoleId)">
                                 @(e.IsActive ? "غیرفعال کن" : "فعال کن")
                             </button>
                         </td>

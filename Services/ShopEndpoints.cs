@@ -153,6 +153,8 @@ public static class ShopEndpoints
                 .Select(c => (int?)c.Id)
                 .FirstOrDefaultAsync();
 
+            var vatNow = await SettingsService.VatEnabledAsync(db) ? await SettingsService.VatPercentAsync(db) : 0m;
+
             var order = new SalesOrder
             {
                 OrderNumber = "TEMP",
@@ -181,6 +183,7 @@ public static class ShopEndpoints
                     continue;
                 }
 
+                order.VatPercent = vatNow;
                 order.Items.Add(new SalesOrderItem
                 {
                     ProductId = product.Id,
