@@ -492,6 +492,37 @@
 
             Db.Products.Add(product);
             await Db.SaveChangesAsync();
+
+            // ===== ثبت موجودی اولیه در انبار پیش‌فرض =====
+            // کالایی که موجودی دارد ولی هیچ حرکت انباری ندارد، در انبار پیش‌فرض ثبت می‌شود
+            // تا گزارش موجودی انبارها همیشه با صفحهٔ کالاها هم‌خوان بماند.
+            var defaultWarehouseId = await WarehouseApp.Services.SettingsService.DefaultWarehouseIdAsync(Db);
+
+            if (defaultWarehouseId is not null)
+            {
+                var withStock = await Db.Products.Where(p => p.Quantity > 0).ToListAsync();
+                var withMovement = await Db.StockMovements.Select(m => m.ProductId).Distinct().ToListAsync();
+                var needingMovement = withStock.Where(p => !withMovement.Contains(p.Id)).ToList();
+
+                foreach (var item in needingMovement)
+                {
+                    Db.StockMovements.Add(new StockMovement
+                    {
+                        ProductId = item.Id,
+                        WarehouseId = defaultWarehouseId.Value,
+                        Type = MovementType.In,
+                        Quantity = item.Quantity,
+                        MovementDate = DateTime.Now,
+                        Note = "موجودی اولیه از فایل اکسل"
+                    });
+                }
+
+                if (needingMovement.Count > 0)
+                {
+                    await Db.SaveChangesAsync();
+                }
+            }
+
             await LoadProducts();
 
             await AuditAsync("افزودن", "کالا", product.Id,
@@ -566,6 +597,37 @@
             editingProduct.IsActive = form.IsActive;
 
             await Db.SaveChangesAsync();
+
+            // ===== ثبت موجودی اولیه در انبار پیش‌فرض =====
+            // کالایی که موجودی دارد ولی هیچ حرکت انباری ندارد، در انبار پیش‌فرض ثبت می‌شود
+            // تا گزارش موجودی انبارها همیشه با صفحهٔ کالاها هم‌خوان بماند.
+            var defaultWarehouseId = await WarehouseApp.Services.SettingsService.DefaultWarehouseIdAsync(Db);
+
+            if (defaultWarehouseId is not null)
+            {
+                var withStock = await Db.Products.Where(p => p.Quantity > 0).ToListAsync();
+                var withMovement = await Db.StockMovements.Select(m => m.ProductId).Distinct().ToListAsync();
+                var needingMovement = withStock.Where(p => !withMovement.Contains(p.Id)).ToList();
+
+                foreach (var item in needingMovement)
+                {
+                    Db.StockMovements.Add(new StockMovement
+                    {
+                        ProductId = item.Id,
+                        WarehouseId = defaultWarehouseId.Value,
+                        Type = MovementType.In,
+                        Quantity = item.Quantity,
+                        MovementDate = DateTime.Now,
+                        Note = "موجودی اولیه از فایل اکسل"
+                    });
+                }
+
+                if (needingMovement.Count > 0)
+                {
+                    await Db.SaveChangesAsync();
+                }
+            }
+
             await LoadProducts();
 
             await AuditAsync("ویرایش", "کالا", editingProduct.Id, $"شناسنامهٔ کالا «{editingProduct.Name}» ویرایش شد");
@@ -596,6 +658,37 @@
         {
             Db.Products.Remove(product);
             await Db.SaveChangesAsync();
+
+            // ===== ثبت موجودی اولیه در انبار پیش‌فرض =====
+            // کالایی که موجودی دارد ولی هیچ حرکت انباری ندارد، در انبار پیش‌فرض ثبت می‌شود
+            // تا گزارش موجودی انبارها همیشه با صفحهٔ کالاها هم‌خوان بماند.
+            var defaultWarehouseId = await WarehouseApp.Services.SettingsService.DefaultWarehouseIdAsync(Db);
+
+            if (defaultWarehouseId is not null)
+            {
+                var withStock = await Db.Products.Where(p => p.Quantity > 0).ToListAsync();
+                var withMovement = await Db.StockMovements.Select(m => m.ProductId).Distinct().ToListAsync();
+                var needingMovement = withStock.Where(p => !withMovement.Contains(p.Id)).ToList();
+
+                foreach (var item in needingMovement)
+                {
+                    Db.StockMovements.Add(new StockMovement
+                    {
+                        ProductId = item.Id,
+                        WarehouseId = defaultWarehouseId.Value,
+                        Type = MovementType.In,
+                        Quantity = item.Quantity,
+                        MovementDate = DateTime.Now,
+                        Note = "موجودی اولیه از فایل اکسل"
+                    });
+                }
+
+                if (needingMovement.Count > 0)
+                {
+                    await Db.SaveChangesAsync();
+                }
+            }
+
             await LoadProducts();
             await AuditAsync("حذف", "کالا", product.Id, $"کالا «{product.Name}» حذف شد");
             Toasts.ShowSuccess($"کالای «{product.Name}» حذف شد");
@@ -943,6 +1036,37 @@
             }
 
             await Db.SaveChangesAsync();
+
+            // ===== ثبت موجودی اولیه در انبار پیش‌فرض =====
+            // کالایی که موجودی دارد ولی هیچ حرکت انباری ندارد، در انبار پیش‌فرض ثبت می‌شود
+            // تا گزارش موجودی انبارها همیشه با صفحهٔ کالاها هم‌خوان بماند.
+            var defaultWarehouseId = await WarehouseApp.Services.SettingsService.DefaultWarehouseIdAsync(Db);
+
+            if (defaultWarehouseId is not null)
+            {
+                var withStock = await Db.Products.Where(p => p.Quantity > 0).ToListAsync();
+                var withMovement = await Db.StockMovements.Select(m => m.ProductId).Distinct().ToListAsync();
+                var needingMovement = withStock.Where(p => !withMovement.Contains(p.Id)).ToList();
+
+                foreach (var item in needingMovement)
+                {
+                    Db.StockMovements.Add(new StockMovement
+                    {
+                        ProductId = item.Id,
+                        WarehouseId = defaultWarehouseId.Value,
+                        Type = MovementType.In,
+                        Quantity = item.Quantity,
+                        MovementDate = DateTime.Now,
+                        Note = "موجودی اولیه از فایل اکسل"
+                    });
+                }
+
+                if (needingMovement.Count > 0)
+                {
+                    await Db.SaveChangesAsync();
+                }
+            }
+
             await LoadProducts();
 
             Toasts.ShowSuccess($"ورود کالاها از اکسل انجام شد: {added} کالای تازه، {updated} کالای به‌روزشده، {skipped} ردیف بی‌نام");
@@ -1065,6 +1189,37 @@
             }
 
             await Db.SaveChangesAsync();
+
+            // ===== ثبت موجودی اولیه در انبار پیش‌فرض =====
+            // کالایی که موجودی دارد ولی هیچ حرکت انباری ندارد، در انبار پیش‌فرض ثبت می‌شود
+            // تا گزارش موجودی انبارها همیشه با صفحهٔ کالاها هم‌خوان بماند.
+            var defaultWarehouseId = await WarehouseApp.Services.SettingsService.DefaultWarehouseIdAsync(Db);
+
+            if (defaultWarehouseId is not null)
+            {
+                var withStock = await Db.Products.Where(p => p.Quantity > 0).ToListAsync();
+                var withMovement = await Db.StockMovements.Select(m => m.ProductId).Distinct().ToListAsync();
+                var needingMovement = withStock.Where(p => !withMovement.Contains(p.Id)).ToList();
+
+                foreach (var item in needingMovement)
+                {
+                    Db.StockMovements.Add(new StockMovement
+                    {
+                        ProductId = item.Id,
+                        WarehouseId = defaultWarehouseId.Value,
+                        Type = MovementType.In,
+                        Quantity = item.Quantity,
+                        MovementDate = DateTime.Now,
+                        Note = "موجودی اولیه از فایل اکسل"
+                    });
+                }
+
+                if (needingMovement.Count > 0)
+                {
+                    await Db.SaveChangesAsync();
+                }
+            }
+
             await LoadProducts();
 
             Toasts.ShowSuccess($"قیمت {updated} کالا به‌روزرسانی شد" + (missing > 0 ? $" — {missing} کد در سیستم پیدا نشد" : ""));

@@ -19,6 +19,9 @@ public static class SettingKeys
     public const string CompanyEconomicCode = "Company.EconomicCode";
     public const string CompanyNationalId = "Company.NationalId";
 
+    // ===== انبار =====
+    public const string DefaultWarehouseId = "Warehouse.DefaultId";
+
     // ===== فروش =====
     public const string InvoicePrefix = "Sales.InvoicePrefix";
     public const string DefaultPaymentDays = "Sales.DefaultPaymentDays";
@@ -64,6 +67,23 @@ public static class SettingsService
 
     public static Task<bool> VatEnabledAsync(ApplicationDbContext db)
         => GetBoolAsync(db, SettingKeys.VatEnabled, false);
+
+    /// <summary>شناسهٔ انبار پیش‌فرض برای موجودی اولیهٔ کالاهای تازه — اگر تنظیم نشده باشد، اولین انبار فعال</summary>
+    public static async Task<int?> DefaultWarehouseIdAsync(ApplicationDbContext db)
+    {
+        var text = await GetAsync(db, SettingKeys.DefaultWarehouseId);
+
+        if (int.TryParse(text, out var id) && id > 0)
+        {
+            return id;
+        }
+
+        return await db.Warehouses
+            .Where(w => w.IsActive)
+            .OrderBy(w => w.Id)
+            .Select(w => (int?)w.Id)
+            .FirstOrDefaultAsync();
+    }
 
     /// <summary>ذخیرهٔ یک تنظیم (اگر نبود، ساخته می‌شود) همراه با ثبت رویداد</summary>
     public static async Task<(bool Ok, string Message)> SetAsync(

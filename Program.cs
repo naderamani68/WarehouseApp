@@ -249,4 +249,36 @@ app.MapRazorComponents<App>()
 // ===== نقطه‌های ورود فروشگاه (سبد خرید و ثبت سفارش) =====
 app.MapShopEndpoints();
 
+// ===== ردیف تنظیمات «انبار پیش‌فرض» برای پایگاه‌های موجود =====
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<WarehouseApp.Data.ApplicationDbContext>>();
+        using var db = factory.CreateDbContext();
+
+        if (!db.AppSettings.Any(s => s.Key == WarehouseApp.Services.SettingKeys.DefaultWarehouseId))
+        {
+            db.AppSettings.Add(new WarehouseApp.Data.AppSetting
+            {
+                Key = WarehouseApp.Services.SettingKeys.DefaultWarehouseId,
+                Value = "",
+                Title = "انبار پیش‌فرض موجودی اولیه",
+                Group = "انبار",
+                ValueType = "warehouse",
+                SortOrder = 1,
+                Hint = "موجودی کالاهای تازه‌ای که از فایل اکسل می‌آید در این انبار ثبت می‌شود",
+                UpdatedAt = DateTime.Now
+            });
+
+            db.SaveChanges();
+            Console.WriteLine("setting seeded: " + WarehouseApp.Services.SettingKeys.DefaultWarehouseId);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("setting seed skipped: " + ex.Message);
+    }
+}
+
 app.Run();
