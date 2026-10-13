@@ -114,7 +114,16 @@ public class ExcelImportService
             }
 
             party.Name = name;
-            party.Type = ParsePartyType(Text(row.Cell(3)));
+            var typeText = Text(row.Cell(3)).Trim();
+
+            if (!TryParsePartyType(typeText, out var partyType))
+            {
+                skipped++;
+                Add(notes, $"ردیف {row.RowNumber()}: نوع «{typeText}» شناخته نشد — یکی از مشتری، تأمین‌کننده، هر دو");
+                continue;
+            }
+
+            party.Type = partyType;
             party.ContactPerson = Nullable(Text(row.Cell(4)));
             party.Phone = Nullable(Text(row.Cell(5)));
             party.Mobile = string.IsNullOrWhiteSpace(mobile) ? null : Mobile.Normalize(mobile);
@@ -260,6 +269,34 @@ public class ExcelImportService
     }
 
     /// <summary>نوع طرف حساب از متن فارسی یا انگلیسی</summary>
+    private static bool TryParsePartyType(string text, out PartyType type)
+    {
+        switch ((text ?? string.Empty).Trim())
+        {
+            case "":
+            case "مشتری":
+            case "Customer":
+                type = PartyType.Customer;
+                return true;
+
+            case "تأمین‌کننده":
+            case "تامین کننده":
+            case "Supplier":
+                type = PartyType.Supplier;
+                return true;
+
+            case "هر دو":
+            case "مشتری و تأمین‌کننده":
+            case "Both":
+                type = PartyType.Both;
+                return true;
+
+            default:
+                type = PartyType.Customer;
+                return false;
+        }
+    }
+
     private static PartyType ParsePartyType(string text) => text.Trim() switch
     {
         "تأمین‌کننده" or "تامین کننده" or "Supplier" => PartyType.Supplier,
