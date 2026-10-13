@@ -92,6 +92,15 @@ public class ExcelImportService
                 continue;
             }
 
+            var typeText = Text(row.Cell(3)).Trim();
+
+            if (!TryParsePartyType(typeText, out var partyType))
+            {
+                skipped++;
+                Add(notes, $"ردیف {row.RowNumber()}: نوع «{typeText}» شناخته نشد — یکی از مشتری، تأمین‌کننده، هر دو");
+                continue;
+            }
+
             var party = parties.FirstOrDefault(p => !string.IsNullOrWhiteSpace(code) && p.Code == code)
                         ?? parties.FirstOrDefault(p => p.Name == name);
 
@@ -114,15 +123,6 @@ public class ExcelImportService
             }
 
             party.Name = name;
-            var typeText = Text(row.Cell(3)).Trim();
-
-            if (!TryParsePartyType(typeText, out var partyType))
-            {
-                skipped++;
-                Add(notes, $"ردیف {row.RowNumber()}: نوع «{typeText}» شناخته نشد — یکی از مشتری، تأمین‌کننده، هر دو");
-                continue;
-            }
-
             party.Type = partyType;
             party.ContactPerson = Nullable(Text(row.Cell(4)));
             party.Phone = Nullable(Text(row.Cell(5)));
