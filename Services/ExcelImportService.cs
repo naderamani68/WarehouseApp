@@ -182,11 +182,9 @@ public class ExcelImportService
 
             if (!string.IsNullOrWhiteSpace(parentName) && parent is null)
             {
-                parent = new Category { Name = parentName, IsActive = true };
-                _db.Categories.Add(parent);
-                categories.Add(parent);
-                added++;
-                Add(notes, $"دستهٔ مادر «{parentName}» ساخته شد");
+                skipped++;
+                Add(notes, $"ردیف {row.RowNumber()}: دستهٔ مادر «{parentName}» در سیستم نیست — اول آن را بساز");
+                continue;
             }
 
             var category = categories.FirstOrDefault(c => c.Name == name);

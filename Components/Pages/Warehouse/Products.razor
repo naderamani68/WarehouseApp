@@ -871,6 +871,15 @@
                 }
 
                 product.Name = name;
+                var unitText = row.Cell(3).GetString().Trim();
+
+                if (unitText.Length > 0 && !new[] { "عدد", "کارتن", "کیلوگرم", "لیتر", "بسته", "جعبه", "متر", "خدمت" }.Contains(unitText))
+                {
+                    skipped++;
+                    Toasts.ShowError($"ردیف {row.RowNumber()}: واحد «{unitText}» شناخته نشد");
+                    continue;
+                }
+
                 product.Unit = ParseUnitText(row.Cell(3).GetString());
 
                 var salePrice = ParseNum(row.Cell(4).GetString());
@@ -898,6 +907,13 @@
                 }
 
                 var categoryName = row.Cell(8).GetString().Trim();
+
+                if (!string.IsNullOrWhiteSpace(categoryName) && !categories.Any(c => c.Name == categoryName))
+                {
+                    skipped++;
+                    Toasts.ShowError($"ردیف {row.RowNumber()}: دستهٔ «{categoryName}» در سیستم نیست");
+                    continue;
+                }
                 if (!string.IsNullOrWhiteSpace(categoryName))
                 {
                     var category = categories.FirstOrDefault(c => c.Name == categoryName);
