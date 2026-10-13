@@ -262,9 +262,20 @@
                                     {
                                         <tr>
                                             <td>@row</td>
-                                            <td>🏢 @item.WarehouseName</td>
+                                            <td>
+                                                @if (item.WithoutWarehouse)
+                                                {
+                                                    <span class="badge bg-warning text-dark">⚠ بدون انبار</span>
+                                                }
+                                                else
+                                                {
+                                                    <text>🏢 @item.WarehouseName</text>
+                                                }
+                                            </td>
                                             <td>📦 @item.ProductName</td>
-                                            <td class="text-end fw-bold">@item.Quantity.ToString("N0")</td>
+                                            <td class="text-end fw-bold">
+                                                @item.Quantity.ToString("N0") <span class="text-muted small">@item.UnitName</span>
+                                            </td>
                                             <td class="text-center">
                                                 @if (item.Quantity > 0)
                                                 {
@@ -317,8 +328,11 @@
                                 <div class="card-body text-center">
                                     <div style="font-size: 2rem;">📊</div>
                                     <h6 class="text-muted mt-2">مجموع موجودی</h6>
-                                    <p class="fw-bold fs-4 text-info mb-0">
-                                        @inventory.Sum(i => i.Quantity).ToString("N0")
+                                    <p class="fw-bold text-info mb-0">
+                                        @foreach (var unitGroup in inventory.GroupBy(i => i.UnitName))
+                                        {
+                                            <span class="d-block">@unitGroup.Sum(x => x.Quantity).ToString("N0") <span class="small">@unitGroup.Key</span></span>
+                                        }
                                     </p>
                                 </div>
                             </div>
@@ -396,7 +410,9 @@
 
     // ===== مدل داخلی جدول موجودی =====
     private class InventoryItem
-    {
+    {        public int ProductId { get; set; }
+        public string UnitName { get; set; } = string.Empty;
+        public bool WithoutWarehouse { get; set; }
         public string ProductName { get; set; } = "";
         public string WarehouseName { get; set; } = "";
         public int Quantity { get; set; }
@@ -469,6 +485,7 @@
             .Select(g => new InventoryItem
                 {
                     ProductName = g.First().Product!.Name ?? "(بدون نام)",
+                    ProductId = g.Key.ProductId,
                     WarehouseName = g.First().Warehouse!.Name,
                     Quantity = g.Sum(m => m.Type == MovementType.In ? m.Quantity : -m.Quantity)
                 })
@@ -476,6 +493,39 @@
             .OrderBy(i => i.WarehouseName)
             .ThenBy(i => i.ProductName)
             .ToListAsync();
+
+        var products = await Db.Products.ToListAsync();
+        var unitById = products.ToDictionary(p => p.Id, p => p.UnitTitle);
+
+        foreach (var item in inventory)
+        {
+            item.UnitName = unitById.TryGetValue(item.ProductId, out var unitName) ? unitName : "عدد";
+        }
+
+        // ===== کالاهایی که موجودی دارند ولی در هیچ انباری ثبت نشده‌اند =====
+        var assignedByProduct = inventory
+            .Where(i => !i.WithoutWarehouse)
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        foreach (var product in products)
+        {
+            var assigned = assignedByProduct.TryGetValue(product.Id, out var sum) ? sum : 0;
+            var unassigned = product.Quantity - assigned;
+
+            if (unassigned != 0)
+            {
+                inventory.Add(new InventoryItem
+                {
+                    ProductId = product.Id,
+                    ProductName = product.Name ?? "(بدون نام)",
+                    WarehouseName = "بدون انبار",
+                    Quantity = unassigned,
+                    UnitName = product.UnitTitle,
+                    WithoutWarehouse = true
+                });
+            }
+        }
 
         loading = false;
     }
