@@ -551,7 +551,7 @@ else
         /// <summary>دانلود فایل نمونهٔ ورود طرف حساب‌ها</summary>
     private async Task DownloadPartyTemplate()
     {
-        var bytes = WarehouseApp.Services.ExcelTemplates.Parties();
+        var bytes = await WarehouseApp.Services.ExcelTemplates.PartiesAsync(Db);
         await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-طرف-حسابها.xlsx", Convert.ToBase64String(bytes));
     }
 

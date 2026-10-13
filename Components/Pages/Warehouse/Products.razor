@@ -799,14 +799,14 @@
     /// <summary>دانلود فایل نمونهٔ ورود گروهی کالاها</summary>
     private async Task DownloadProductTemplate()
     {
-        var bytes = WarehouseApp.Services.ExcelTemplates.Products();
+        var bytes = await WarehouseApp.Services.ExcelTemplates.ProductsAsync(Db);
         await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-کالاها.xlsx", Convert.ToBase64String(bytes));
     }
 
     /// <summary>دانلود فایل نمونهٔ ورود قیمت‌ها</summary>
     private async Task DownloadPriceTemplate()
     {
-        var bytes = WarehouseApp.Services.ExcelTemplates.Prices();
+        var bytes = await WarehouseApp.Services.ExcelTemplates.PricesAsync(Db);
         await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-قیمت‌ها.xlsx", Convert.ToBase64String(bytes));
     }
 

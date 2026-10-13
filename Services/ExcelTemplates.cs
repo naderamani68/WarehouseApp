@@ -1,4 +1,6 @@
-﻿namespace WarehouseApp.Services;
+﻿using Microsoft.EntityFrameworkCore;
+using ClosedXML.Excel;
+namespace WarehouseApp.Services;
 
 /// <summary>
 /// فایل‌های نمونهٔ اکسل برای وارد کردن داده.
@@ -7,6 +9,102 @@
 /// </summary>
 public static class ExcelTemplates
 {
+    /// <summary>برگهٔ دوم: فهرست‌های پویا از روی دادهٔ خود سیستم</summary>
+    private static byte[] WithLists(byte[] file, IEnumerable<(string Title, IEnumerable<string?> Values)> lists)
+    {
+        using var input = new MemoryStream(file);
+        using var workbook = new XLWorkbook(input);
+
+        var sheet = workbook.Worksheets.Add("فهرست‌ها");
+        var column = 1;
+
+        foreach (var (title, values) in lists)
+        {
+            var head = sheet.Cell(1, column);
+            head.Value = title;
+            head.Style.Font.Bold = true;
+            head.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+            var row = 2;
+            foreach (var value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                var cell = sheet.Cell(row, column);
+                cell.Value = value;
+                cell.Style.NumberFormat.Format = "@";
+                row++;
+            }
+
+            sheet.Column(column).Width = 34;
+            column++;
+        }
+
+        using var output = new MemoryStream();
+        workbook.SaveAs(output);
+        return output.ToArray();
+    }
+
+    public static async Task<byte[]> ProductsAsync(WarehouseApp.Data.ApplicationDbContext db)
+    {
+        var categories = await db.Categories
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .Select(c => c.Name)
+            .ToListAsync();
+
+        var units = new[] { "عدد", "کارتن", "کیلوگرم", "لیتر", "بسته", "جعبه", "متر", "خدمت" };
+
+        return WithLists(Products(), new (string, IEnumerable<string?>)[]
+        {
+            ("دسته‌بندی — فقط از این فهرست انتخاب کن", categories),
+            ("واحد — خالی بگذاری «عدد» می‌شود", units)
+        });
+    }
+
+    public static async Task<byte[]> PricesAsync(WarehouseApp.Data.ApplicationDbContext db)
+    {
+        var products = await db.Products
+            .Where(p => p.Code != null)
+            .OrderBy(p => p.Name)
+            .Select(p => p.Code + " — " + p.Name)
+            .ToListAsync();
+
+        return WithLists(Prices(), new (string, IEnumerable<string?>)[]
+        {
+            ("کالاهای موجود — کد و نام", products)
+        });
+    }
+
+    public static async Task<byte[]> PartiesAsync(WarehouseApp.Data.ApplicationDbContext db)
+    {
+        var parties = await db.Parties
+            .OrderBy(p => p.Name)
+            .Select(p => p.Code + " — " + p.Name)
+            .ToListAsync();
+
+        return WithLists(Parties(), new (string, IEnumerable<string?>)[]
+        {
+            ("نوع — فقط یکی از این سه", new[] { "مشتری", "تأمین‌کننده", "هر دو" }),
+            ("طرف حساب‌های موجود", parties)
+        });
+    }
+
+    public static async Task<byte[]> CategoriesAsync(WarehouseApp.Data.ApplicationDbContext db)
+    {
+        var names = await db.Categories
+            .OrderBy(c => c.Name)
+            .Select(c => c.Name)
+            .ToListAsync();
+
+        return WithLists(Categories(), new (string, IEnumerable<string?>)[]
+        {
+            ("دسته‌های موجود — برای ستون دستهٔ مادر", names)
+        });
+    }
     /// <summary>
     /// نمونهٔ ورود گروهی کالاها.
     /// ترتیب ستون‌ها مهم است: کد، نام، واحد، قیمت فروش، بهای خرید، موجودی، حد سفارش، دسته‌بندی.

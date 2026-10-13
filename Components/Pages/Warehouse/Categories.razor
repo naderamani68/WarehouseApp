@@ -428,7 +428,7 @@
         /// <summary>دانلود فایل نمونهٔ ورود دسته‌بندی‌ها</summary>
     private async Task DownloadCategoryTemplate()
     {
-        var bytes = WarehouseApp.Services.ExcelTemplates.Categories();
+        var bytes = await WarehouseApp.Services.ExcelTemplates.CategoriesAsync(Db);
         await JS.InvokeVoidAsync("downloadFileFromBase64", "نمونه-ورود-دسته‌بندیها.xlsx", Convert.ToBase64String(bytes));
     }
 
