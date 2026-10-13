@@ -214,7 +214,7 @@ public class ExcelImportService
 
     private static IXLWorksheet? OpenSheet(Stream stream, List<string> notes)
     {
-        var workbook = new XLWorkbook(WarehouseApp.Services.ExcelService.StageImportFile(stream));
+        var workbook = new XLWorkbook(stream);
         var sheet = workbook.Worksheets.FirstOrDefault();
 
         if (sheet is null)

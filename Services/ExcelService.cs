@@ -5,41 +5,6 @@ namespace WarehouseApp.Services;
 
 public class ExcelService
 {
-    /// <summary>
-    /// فایل بارگذاری‌شده را روی دیسک می‌گذارد و مسیرش را برمی‌گرداند.
-    /// چرا؟ بازکردن بستهٔ اکسل از روی جریان، OpenXml را وادار به ساختن فایل موقت در Temp می‌کند
-    /// و روی بعضی سیستم‌ها دسترسی به آن پوشه بسته است.
-    /// </summary>
-    public static string StageImportFile(Stream stream)
-    {
-        var folder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "WarehouseApp", "import");
-
-        try
-        {
-            Directory.CreateDirectory(folder);
-        }
-        catch
-        {
-            folder = Path.Combine(AppContext.BaseDirectory, "import");
-            Directory.CreateDirectory(folder);
-        }
-
-        foreach (var old in Directory.GetFiles(folder, "import-*.xlsx"))
-        {
-            try { File.Delete(old); } catch { }
-        }
-
-        var path = Path.Combine(folder, "import-" + Guid.NewGuid().ToString("N") + ".xlsx");
-
-        using (var file = File.Create(path))
-        {
-            stream.CopyTo(file);
-        }
-
-        return path;
-    }
     private static readonly PersianCalendar _pc = new();
 
     // فونت پیشنهادی برای نمایش صحیح فارسی
