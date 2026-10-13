@@ -455,7 +455,7 @@
 
         try
         {
-            using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            using var stream = await WarehouseApp.Services.ExcelService.CopyUploadAsync(e.File.OpenReadStream(10 * 1024 * 1024));
             using var memory = new MemoryStream();
             await stream.CopyToAsync(memory);
             memory.Position = 0;

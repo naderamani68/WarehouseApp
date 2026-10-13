@@ -839,7 +839,7 @@
 
         try
         {
-            using var stream = e.File.OpenReadStream(5 * 1024 * 1024);
+            using var stream = await WarehouseApp.Services.ExcelService.CopyUploadAsync(e.File.OpenReadStream(5 * 1024 * 1024));
             using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
             var sheet = workbook.Worksheets.FirstOrDefault();
 
@@ -983,7 +983,7 @@
 
         try
         {
-            using var stream = e.File.OpenReadStream(20 * 1024 * 1024);
+            using var stream = await WarehouseApp.Services.ExcelService.CopyUploadAsync(e.File.OpenReadStream(20 * 1024 * 1024));
             using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
 
             var sheet = workbook.Worksheets.FirstOrDefault();
